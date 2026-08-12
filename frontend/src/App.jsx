@@ -1,22 +1,35 @@
-import { auth } from "./config/firebase";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import Dashboard from "./pages/Dashboard";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-      <div className="bg-white p-10 rounded-2xl shadow-lg">
-        <h1 className="text-3xl font-bold">
-          AI Resume Analyzer
-        </h1>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-        <p className="mt-3 text-gray-600">
-          Firebase Auth Ready
-        </p>
+        <Route path="/login" element={<Login />} />
 
-        <p className="mt-2 text-sm text-gray-400">
-          Auth object: {auth ? "Connected" : "Not connected"}
-        </p>
-      </div>
-    </div>
+        <Route path="/register" element={<Register />} />
+
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="*"
+          element={<Navigate to="/dashboard" replace />}
+        />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
