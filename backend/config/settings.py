@@ -11,6 +11,10 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
 from pathlib import Path
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -26,6 +30,9 @@ SECRET_KEY = "django-insecure-vl#a!jcq7j&%3t0h=86e&(a21^jqya6=arrwc!dh-@#4y%7h(u
 DEBUG = True
 
 ALLOWED_HOSTS = []
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+GEMINI_MODEL = "gemini-3.5-flash"
 
 
 # Application definition
