@@ -4,10 +4,13 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from .serializers import ResumeUploadSerializer
+
 from .services.pdf_parser import (
     extract_pdf_text,
     extract_docx_text,
 )
+
+from .services.ai_analyzer import analyze_resume
 
 
 class UploadResumeView(GenericAPIView):
@@ -31,6 +34,80 @@ class UploadResumeView(GenericAPIView):
         file_name = resume.name.lower()
 
         try:
+
+            # Extract text from PDF or DOCX
+            if file_name.endswith(".pdf"):
+                text = extract_pdf_text(resume)
+
+            elif file_name.endswith(".docx"):
+                text = extract_docx_text(resume)
+
+            else:
+                return Response(
+                    {
+                        "success": False,
+                        "error": "Only PDF and DOCX files are supported.",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Check whether text was extracted
+            if not text:
+                return Response(
+                    {
+                        "success": False,
+                        "error": "Could not extract text from the resume.",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            return Response(
+                {
+                    "success": True,
+                    "filename": resume.name,
+                    "text": text,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception:
+            return Response(
+                {
+                    "success": False,
+                    "error": "Unable to process the resume.",
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class AnalyzeResumeView(GenericAPIView):
+    serializer_class = ResumeUploadSerializer
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request, *args, **kwargs):
+
+        serializer = self.get_serializer(data=request.data)
+
+        if not serializer.is_valid():
+            return Response(
+                {
+                    "success": False,
+                    "errors": serializer.errors,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        resume = serializer.validated_data["resume"]
+
+        job_description = serializer.validated_data.get(
+            "job_description",
+            ""
+        )
+
+        file_name = resume.name.lower()
+
+        try:
+
             if file_name.endswith(".pdf"):
                 text = extract_pdf_text(resume)
 
@@ -55,20 +132,26 @@ class UploadResumeView(GenericAPIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
+            analysis = analyze_resume(
+                resume_text=text,
+                job_description=job_description,
+            )
+
             return Response(
                 {
                     "success": True,
                     "filename": resume.name,
-                    "text": text,
+                    "analysis": analysis,
                 },
                 status=status.HTTP_200_OK,
             )
 
-        except Exception:
+        except Exception as e:
+
             return Response(
                 {
                     "success": False,
-                    "error": "Unable to process the resume.",
+                    "error": str(e),
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
