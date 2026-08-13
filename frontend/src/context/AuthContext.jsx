@@ -1,5 +1,11 @@
 
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+} from "react";
 
 import {
   onAuthStateChanged,
@@ -16,8 +22,15 @@ const AuthContext = createContext(null);
 
 const googleProvider = new GoogleAuthProvider();
 
-// Django backend
+// =====================================================
+// DJANGO BACKEND
+// =====================================================
+
 const API_URL = "http://127.0.0.1:8000";
+
+// =====================================================
+// AUTH PROVIDER
+// =====================================================
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -25,38 +38,55 @@ export function AuthProvider({ children }) {
 
   // =====================================================
   // SEND FIREBASE USER TO DJANGO
+  // Used after Firebase login/register
   // =====================================================
 
   const sendTokenToDjango = async (firebaseUser) => {
     console.log("🔵 Sending Firebase token to Django...");
 
     try {
+      if (!firebaseUser) {
+        console.error("❌ No Firebase user provided.");
+        return null;
+      }
+
       // Get Firebase ID token
-      const idToken = await firebaseUser.getIdToken();
+      const idToken = await firebaseUser.getIdToken(true);
 
       console.log("✅ Firebase ID token received");
       console.log("🆔 UID:", firebaseUser.uid);
       console.log("📧 Email:", firebaseUser.email);
+      console.log("🔑 Token exists:", Boolean(idToken));
 
-      // Send token to Django
+      // Send token to Django login endpoint
       const response = await fetch(
         `${API_URL}/api/auth/login/`,
         {
           method: "POST",
+
           headers: {
             "Content-Type": "application/json",
           },
+          // Include credentials so Django can set/read session cookies
+          credentials: "include",
+
           body: JSON.stringify({
             idToken: idToken,
           }),
         }
       );
 
-      console.log("🐍 Django status:", response.status);
+      console.log(
+        "🐍 Django login status:",
+        response.status
+      );
 
       const data = await response.json();
 
-      console.log("🐍 Django response:", data);
+      console.log(
+        "🐍 Django login response:",
+        data
+      );
 
       if (!response.ok) {
         console.error(
@@ -71,6 +101,7 @@ export function AuthProvider({ children }) {
       );
 
       return data;
+
     } catch (error) {
       console.error(
         "❌ Could not connect to Django"
@@ -78,25 +109,229 @@ export function AuthProvider({ children }) {
 
       console.error("Error:", error);
 
-      // IMPORTANT:
-      // Do NOT throw the error here.
-      // Firebase login should remain successful even
-      // while we are testing the Django connection.
-
       return null;
     }
   };
 
   // =====================================================
+  // AUTHENTICATED DJANGO REQUEST
+  // Used for dashboard and protected APIs
+  // =====================================================
+
+  const djangoRequest = useCallback(
+    async (endpoint, options = {}) => {
+      console.log(
+        "🔵 Starting authenticated Django request..."
+      );
+
+      try {
+        // ==============================================
+        // GET CURRENT FIREBASE USER
+        // ==============================================
+
+        const currentUser = auth.currentUser;
+
+        if (!currentUser) {
+          console.error(
+            "❌ No Firebase user is currently logged in."
+          );
+
+          throw new Error(
+            "No Firebase user is currently logged in."
+          );
+        }
+
+        console.log(
+          "🟢 Firebase user found"
+        );
+
+        console.log(
+          "🆔 Firebase UID:",
+          currentUser.uid
+        );
+
+        console.log(
+          "📧 Email:",
+          currentUser.email
+        );
+
+        // ==============================================
+        // GET FRESH FIREBASE ID TOKEN
+        // true forces Firebase to refresh the token
+        // ==============================================
+
+        const idToken =
+          await currentUser.getIdToken(true);
+
+        if (!idToken) {
+          throw new Error(
+            "Firebase ID token could not be obtained."
+          );
+        }
+
+        console.log(
+          "✅ Fresh Firebase ID token obtained"
+        );
+
+        console.log(
+          "🔑 Token exists:",
+          Boolean(idToken)
+        );
+
+        console.log(
+          "🔑 Token length:",
+          idToken.length
+        );
+
+        // ==============================================
+        // CREATE HEADERS
+        // ==============================================
+
+        const headers = new Headers(
+          options.headers || {}
+        );
+
+        headers.set(
+          "Authorization",
+          `Bearer ${idToken}`
+        );
+
+        // Only set Content-Type if a body exists, is not FormData,
+        // and caller hasn't already specified it.
+        if (
+          options.body &&
+          !headers.has("Content-Type") &&
+          !(options.body instanceof FormData)
+        ) {
+          headers.set(
+            "Content-Type",
+            "application/json"
+          );
+        }
+
+        console.log(
+          "📨 Authorization header prepared:",
+          headers.has("Authorization")
+        );
+
+        // ==============================================
+        // SEND REQUEST TO DJANGO
+        // ==============================================
+
+        console.log(
+          "🌐 Request URL:",
+          `${API_URL}${endpoint}`
+        );
+
+        const response = await fetch(
+          `${API_URL}${endpoint}`,
+          {
+            ...options,
+            headers,
+            // Include credentials to allow session-based fallback
+            credentials: "include",
+          }
+        );
+
+        console.log(
+          "🐍 Django status:",
+          response.status
+        );
+
+        // ==============================================
+        // READ RESPONSE
+        // ==============================================
+
+        const contentType =
+          response.headers.get(
+            "content-type"
+          );
+
+        let data;
+
+        if (
+          contentType &&
+          contentType.includes("application/json")
+        ) {
+          data = await response.json();
+        } else {
+          data = await response.text();
+        }
+
+        console.log(
+          "🐍 Django response:",
+          data
+        );
+
+        // ==============================================
+        // HANDLE ERROR
+        // ==============================================
+
+        if (!response.ok) {
+          console.error(
+            "❌ Django request failed:",
+            response.status
+          );
+
+          if (typeof data === "object") {
+            throw new Error(
+              data.detail ||
+              data.error ||
+              "Django request failed."
+            );
+          }
+
+          throw new Error(
+            data ||
+            "Django request failed."
+          );
+        }
+
+        // ==============================================
+        // SUCCESS
+        // ==============================================
+
+        console.log(
+          "🟢 Django request successful"
+        );
+
+        return data;
+
+      } catch (error) {
+        console.error(
+          "❌ djangoRequest failed:"
+        );
+
+        console.error(error);
+
+        throw error;
+      }
+    },
+    []
+  );
+
+  // =====================================================
   // REGISTER
   // =====================================================
 
-  const register = async (email, password) => {
-    console.log("🔵 Register started");
-    console.log("📧 Email:", email);
+  const register = async (
+    email,
+    password
+  ) => {
+    console.log(
+      "🔵 Register started"
+    );
+
+    console.log(
+      "📧 Email:",
+      email
+    );
 
     try {
-      // Firebase registration
+      // ==============================================
+      // FIREBASE REGISTRATION
+      // ==============================================
+
       const result =
         await createUserWithEmailAndPassword(
           auth,
@@ -123,12 +358,32 @@ export function AuthProvider({ children }) {
         result.user.email
       );
 
-      // Send Firebase token to Django
-      await sendTokenToDjango(result.user);
+      // ==============================================
+      // SEND USER TO DJANGO
+      // ==============================================
 
-      // Return Firebase result exactly like
-      // your original working code
+      const djangoResponse =
+        await sendTokenToDjango(
+          result.user
+        );
+
+      if (djangoResponse) {
+        console.log(
+          "✅ Django user created/updated"
+        );
+
+        console.log(
+          "👤 Django response:",
+          djangoResponse
+        );
+      } else {
+        console.log(
+          "⚠️ Firebase registration succeeded, but Django sync failed"
+        );
+      }
+
       return result;
+
     } catch (error) {
       console.error(
         "❌ Registration failed"
@@ -152,14 +407,23 @@ export function AuthProvider({ children }) {
   // EMAIL LOGIN
   // =====================================================
 
-  const login = async (email, password) => {
-    console.log("🔵 Email login started");
-    console.log("📧 Email:", email);
+  const login = async (
+    email,
+    password
+  ) => {
+    console.log(
+      "🔵 Email login started"
+    );
+
+    console.log(
+      "📧 Email:",
+      email
+    );
 
     try {
-      // ================================
-      // STEP 1: FIREBASE LOGIN
-      // ================================
+      // ==============================================
+      // FIREBASE LOGIN
+      // ==============================================
 
       const result =
         await signInWithEmailAndPassword(
@@ -187,9 +451,9 @@ export function AuthProvider({ children }) {
         result.user.email
       );
 
-      // ================================
-      // STEP 2: DJANGO LOGIN
-      // ================================
+      // ==============================================
+      // CONNECT USER TO DJANGO
+      // ==============================================
 
       console.log(
         "🔵 Now connecting Firebase user to Django..."
@@ -215,14 +479,8 @@ export function AuthProvider({ children }) {
         );
       }
 
-      // ================================
-      // IMPORTANT
-      // ================================
-
-      // Return Firebase result exactly
-      // like your original working code.
-
       return result;
+
     } catch (error) {
       console.error(
         "❌ Email login failed"
@@ -247,10 +505,15 @@ export function AuthProvider({ children }) {
   // =====================================================
 
   const googleLogin = async () => {
-    console.log("🔵 Google login started");
+    console.log(
+      "🔵 Google login started"
+    );
 
     try {
-      // Firebase Google login
+      // ==============================================
+      // FIREBASE GOOGLE LOGIN
+      // ==============================================
+
       const result =
         await signInWithPopup(
           auth,
@@ -286,13 +549,27 @@ export function AuthProvider({ children }) {
         result.user.photoURL
       );
 
-      // Send Firebase token to Django
-      await sendTokenToDjango(
-        result.user
-      );
+      // ==============================================
+      // SEND USER TO DJANGO
+      // ==============================================
 
-      // Return original Firebase result
+      const djangoResponse =
+        await sendTokenToDjango(
+          result.user
+        );
+
+      if (djangoResponse) {
+        console.log(
+          "✅ Google user authenticated with Django"
+        );
+      } else {
+        console.log(
+          "⚠️ Google Firebase login succeeded, but Django sync failed"
+        );
+      }
+
       return result;
+
     } catch (error) {
       console.error(
         "❌ Google login failed"
@@ -317,7 +594,9 @@ export function AuthProvider({ children }) {
   // =====================================================
 
   const logout = async () => {
-    console.log("🔵 Logout started");
+    console.log(
+      "🔵 Logout started"
+    );
 
     try {
       await signOut(auth);
@@ -325,6 +604,7 @@ export function AuthProvider({ children }) {
       console.log(
         "✅ Logout successful"
       );
+
     } catch (error) {
       console.error(
         "❌ Logout failed"
@@ -357,6 +637,7 @@ export function AuthProvider({ children }) {
       onAuthStateChanged(
         auth,
         (currentUser) => {
+
           if (currentUser) {
             console.log(
               "🟢 User is authenticated"
@@ -381,6 +662,7 @@ export function AuthProvider({ children }) {
               "👨 Name:",
               currentUser.displayName
             );
+
           } else {
             console.log(
               "⚪ No authenticated user"
@@ -399,6 +681,7 @@ export function AuthProvider({ children }) {
 
       unsubscribe();
     };
+
   }, []);
 
   // =====================================================
@@ -408,11 +691,19 @@ export function AuthProvider({ children }) {
   const value = {
     user,
     loading,
+
     register,
     login,
     googleLogin,
     logout,
+
+    // Protected Django API
+    djangoRequest,
   };
+
+  // =====================================================
+  // PROVIDER
+  // =====================================================
 
   return (
     <AuthContext.Provider value={value}>
