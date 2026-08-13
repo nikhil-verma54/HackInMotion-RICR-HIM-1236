@@ -62,6 +62,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "authentication.middleware.FirebaseSessionMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -142,13 +143,44 @@ MAILERS = {
         "BACKEND": "django.core.mail.backends.console.EmailBackend",
     },
 }
-CORS_ALLOW_ALL_ORIGINS = True
+from corsheaders.defaults import default_headers
+
+# Restrict CORS to the frontend origin and allow credentials
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+]
+
+# Ensure the Authorization header is allowed for CORS requests
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    "authorization",
+]
+
+# Allow cookies/sessions for browser requests when needed
+CORS_ALLOW_CREDENTIALS = True
+
+# Allow cross-site cookies for local development (adjust for production!)
+SESSION_COOKIE_SAMESITE = None
+CSRF_COOKIE_SAMESITE = None
+
+# Not secure for production — development only
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
 
 REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "analyzer.authentication.FirebaseAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+    ],
     "DEFAULT_PARSER_CLASSES": [
         "rest_framework.parsers.JSONParser",
         "rest_framework.parsers.FormParser",
         "rest_framework.parsers.MultiPartParser",
+    ],
+    "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",
         "rest_framework.renderers.BrowsableAPIRenderer",
     ],

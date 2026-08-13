@@ -1,4 +1,6 @@
 from rest_framework.views import APIView
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework.response import Response
 from rest_framework import status
 
@@ -7,16 +9,13 @@ from config import firebase
 
 from firebase_admin import auth
 
-from .models import UserProfile
+from authentication.models import UserProfile
 
 
+@method_decorator(csrf_exempt, name="dispatch")
 class FirebaseLoginView(APIView):
 
     def post(self, request):
-
-        print("\n==============================")
-        print("🔥 FIREBASE LOGIN REQUEST")
-        print("==============================")
 
         # ==========================================
         # 1. GET FIREBASE ID TOKEN
@@ -24,13 +23,7 @@ class FirebaseLoginView(APIView):
 
         id_token = request.data.get("idToken")
 
-        print("📦 Request data received")
-        print("🔑 Token received:", bool(id_token))
-
         if not id_token:
-
-            print("❌ No Firebase token received")
-
             return Response(
                 {
                     "success": False,
@@ -45,11 +38,7 @@ class FirebaseLoginView(APIView):
             # 2. VERIFY FIREBASE TOKEN
             # ==========================================
 
-            print("🔵 Verifying Firebase ID token...")
-
             decoded_token = auth.verify_id_token(id_token)
-
-            print("✅ FIREBASE TOKEN VERIFIED")
 
             # ==========================================
             # 3. GET FIREBASE USER DATA
@@ -59,11 +48,6 @@ class FirebaseLoginView(APIView):
             email = decoded_token.get("email")
             name = decoded_token.get("name")
             picture = decoded_token.get("picture")
-
-            print("🆔 Firebase UID:", firebase_uid)
-            print("📧 Email:", email)
-            print("👨 Name:", name)
-            print("🖼️ Picture:", picture)
 
             # ==========================================
             # 4. CREATE OR GET DJANGO USER
@@ -82,33 +66,22 @@ class FirebaseLoginView(APIView):
             # 5. UPDATE EXISTING USER
             # ==========================================
 
-            if created:
-
-                print("🟢 NEW DJANGO USER CREATED")
-
-            else:
-
-                print("🟡 EXISTING DJANGO USER FOUND")
-
+            if not created:
                 # Update information from Firebase
                 user.email = email or ""
                 user.name = name
                 user.photo_url = picture
-
                 user.save()
 
             # ==========================================
-            # 6. PRINT DJANGO USER INFORMATION
+            # 6. CREATE DJANGO SESSION (for browser requests)
             # ==========================================
 
-            print("🆔 Django User ID:", user.id)
-            print("🔥 Firebase UID:", user.firebase_uid)
-            print("📧 Django Email:", user.email)
-            print("👨 Django Name:", user.name)
-
-            print("==============================")
-            print("🟢 DJANGO AUTHENTICATION SUCCESS")
-            print("==============================\n")
+            try:
+                request.session["firebase_uid"] = firebase_uid
+                request.session.save()
+            except Exception as e:
+                pass  # session save failure is non-fatal
 
             # ==========================================
             # 7. SEND RESPONSE TO REACT
@@ -131,16 +104,6 @@ class FirebaseLoginView(APIView):
             )
 
         except Exception as e:
-
-            print("\n==============================")
-            print("❌ FIREBASE AUTHENTICATION FAILED")
-            print("==============================")
-
-            print("❌ Error type:", type(e).__name__)
-            print("❌ Error:", str(e))
-
-            print("==============================\n")
-
             return Response(
                 {
                     "success": False,
