@@ -36,6 +36,11 @@ GEMINI_MODEL = "gemini-3.5-flash"
 
 
 # Application definition
+FIREBASE_SERVICE_ACCOUNT = os.path.join(
+    BASE_DIR,
+    "firebase",
+    "serviceAccountKey.json"
+)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -47,6 +52,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "corsheaders",
     "analyzer",
+    "authentication",
 ]
 
 MIDDLEWARE = [
