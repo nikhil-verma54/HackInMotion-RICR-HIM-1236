@@ -34,5 +34,13 @@ class UserProfile(models.Model):
     def is_authenticated(self):
         return True
 
+    @property
+    def is_anonymous(self):
+        return False
+
+    @property
+    def is_active(self):
+        return True
+
     def __str__(self):
         return self.email or self.firebase_uid
