@@ -5,6 +5,10 @@ from .views import (
     test_auth,
     dashboard,
     analysis_detail,
+    start_interview,
+    submit_answer,
+    finish_interview,
+    interview_history,
 )
 
 
@@ -14,4 +18,10 @@ urlpatterns = [
     path("test-auth/", test_auth, name="test-auth"),
     path("dashboard/", dashboard, name="dashboard"),
     path("history/<int:analysis_id>/", analysis_detail, name="analysis-detail"),
+
+    # Mock Interview endpoints
+    path("interview/start/", start_interview, name="interview-start"),
+    path("interview/<int:interview_id>/answer/", submit_answer, name="interview-answer"),
+    path("interview/<int:interview_id>/finish/", finish_interview, name="interview-finish"),
+    path("interview/history/", interview_history, name="interview-history"),
 ]
