@@ -50,7 +50,7 @@ function Register() {
   return (
     <div
       style={{
-        minHeight: "100vh",
+        minHeight: "calc(100vh - 62px)",
         display: "grid",
         gridTemplateColumns: "1fr 1fr",
         background: "#f4f6fb",
