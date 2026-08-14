@@ -70,6 +70,13 @@ const Icon = {
       <rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>
     </svg>
   ),
+  History: (p) => (
+    <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+      <path d="M3 3v5h5"/>
+      <polyline points="12 7 12 12 15 15"/>
+    </svg>
+  ),
   X: (p) => (
     <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/>
@@ -94,9 +101,6 @@ const scoreColor = (s) => s >= 8 ? "#16a34a" : s >= 5 ? "#d97706" : "#dc2626";
 const scoreBg    = (s) => s >= 8 ? "#f0fdf4" : s >= 5 ? "#fffbeb" : "#fef2f2";
 const scoreBorder= (s) => s >= 8 ? "#bbf7d0" : s >= 5 ? "#fef3c7" : "#fecaca";
 
-// ─────────────────────────────────────────────
-// Shared style helpers
-// ─────────────────────────────────────────────
 const page = {
   minHeight: "calc(100vh - 62px)",
   background: "#f4f6fb",
@@ -109,17 +113,27 @@ export default function MockInterview() {
   const fileInputRef = useRef(null);
 
   const [step, setStep] = useState("setup");
+  const [setupTab, setSetupTab] = useState("new"); // "new" | "history"
+
+  // Setup state
   const [jobRole, setJobRole] = useState("");
   const [file, setFile] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const [starting, setStarting] = useState(false);
   const [setupError, setSetupError] = useState("");
 
+  // History state
+  const [pastSessions, setPastSessions] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [loadingDetailId, setLoadingDetailId] = useState(null);
+
+  // Voice state
   const [voiceMode, setVoiceMode] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef(null);
 
+  // Interview state
   const [interviewId, setInterviewId] = useState(null);
   const [questions, setQuestions] = useState([]);
   const [currentIdx, setCurrentIdx] = useState(0);
@@ -128,8 +142,54 @@ export default function MockInterview() {
   const [feedback, setFeedback] = useState(null);
   const [allFeedback, setAllFeedback] = useState([]);
 
+  // Summary state
   const [summary, setSummary] = useState(null);
   const [finishing, setFinishing] = useState(false);
+
+  // ── Fetch past interview sessions ─────────────
+  const fetchPastSessions = useCallback(async () => {
+    try {
+      setLoadingHistory(true);
+      const data = await djangoRequest("/api/resume/interview/history/");
+      if (data && data.interviews) {
+        setPastSessions(data.interviews);
+      }
+    } catch (err) {
+      console.error("Failed to load interview history:", err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, [djangoRequest]);
+
+  useEffect(() => {
+    fetchPastSessions();
+  }, [fetchPastSessions]);
+
+  // ── View a past interview in full detail ──────
+  const handleViewPastDetail = async (id) => {
+    setLoadingDetailId(id);
+    try {
+      const data = await djangoRequest(`/api/resume/interview/${id}/detail/`);
+      if (data && data.summary) {
+        setJobRole(data.job_role || "Interview");
+        setSummary(data.summary);
+        // Map questions to feedback array
+        const feedbackList = (data.questions || []).map((q) => ({
+          question: q.question,
+          feedback: q.feedback || {
+            overall: q.score || 0,
+            tip: q.user_answer ? "Recorded answer evaluated." : "Question skipped.",
+          },
+        }));
+        setAllFeedback(feedbackList);
+        setStep("summary");
+      }
+    } catch (err) {
+      console.error("Failed to fetch interview detail:", err);
+    } finally {
+      setLoadingDetailId(null);
+    }
+  };
 
   // ── TTS ──────────────────────────────────────
   const speakText = useCallback((text) => {
@@ -244,6 +304,7 @@ export default function MockInterview() {
       const data = await djangoRequest(`/api/resume/interview/${interviewId}/finish/`, { method: "POST" });
       if (!data?.summary) throw new Error(data?.error || "Summary failed.");
       setSummary(data.summary); setStep("summary");
+      fetchPastSessions(); // Refresh history
       if (voiceMode && data.summary?.verdict) speakText("Interview complete. " + data.summary.verdict);
     } catch (err) {
       setSummary({ error: err.message || "Summary failed." }); setStep("summary");
@@ -255,160 +316,301 @@ export default function MockInterview() {
     setStep("setup"); setJobRole(""); setFile(null);
     setInterviewId(null); setQuestions([]); setCurrentIdx(0);
     setAnswer(""); setFeedback(null); setAllFeedback([]); setSummary(null);
+    fetchPastSessions();
   };
 
   // ══════════════════════════════════════════════
-  // SETUP SCREEN
+  // SETUP SCREEN (NEW INTERVIEW + HISTORY TABS)
   // ══════════════════════════════════════════════
   if (step === "setup") {
     return (
       <div style={{ ...page, display: "flex", alignItems: "flex-start", justifyContent: "center" }}>
-        <div className="card-enter" style={{ width: "100%", maxWidth: 600, background: "#ffffff", borderRadius: 20, padding: "clamp(28px,5vw,44px)", boxShadow: "0 4px 24px rgba(15,23,42,0.07)", border: "1px solid #e2e8f0" }}>
+        <div className="card-enter" style={{ width: "100%", maxWidth: 640, background: "#ffffff", borderRadius: 20, padding: "clamp(24px,5vw,40px)", boxShadow: "0 4px 24px rgba(15,23,42,0.07)", border: "1px solid #e2e8f0" }}>
 
-          {/* Header */}
-          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 28 }}>
-            <div style={{ width: 46, height: 46, borderRadius: 13, background: "linear-gradient(135deg,#4f46e5,#6366f1)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", flexShrink: 0 }}>
-              <Icon.Bot width="20" height="20" />
-            </div>
-            <div>
-              <h1 style={{ fontSize: 20, fontWeight: 800, color: "#0f172a", margin: "0 0 2px", letterSpacing: "-0.03em" }}>AI Mock Interview</h1>
-              <p style={{ color: "#64748b", fontSize: 13.5, margin: 0 }}>Resume-based questions with real-time AI evaluation.</p>
-            </div>
-          </div>
-
-          {/* Voice toggle */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px 16px", marginBottom: 24 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ color: voiceMode ? "#4f46e5" : "#94a3b8" }}>
-                {voiceMode ? <Icon.Volume width="18" height="18" /> : <Icon.VolumeX width="18" height="18" />}
+          {/* Top Bar with Brand & Tab Switcher */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 42, height: 42, borderRadius: 12, background: "linear-gradient(135deg,#4f46e5,#6366f1)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", flexShrink: 0 }}>
+                <Icon.Bot width="18" height="18" />
               </div>
               <div>
-                <div style={{ fontSize: 13.5, fontWeight: 600, color: "#0f172a" }}>Voice assistant</div>
-                <div style={{ fontSize: 12, color: "#64748b" }}>AI reads questions aloud, transcribes your answers</div>
+                <h1 style={{ fontSize: 19, fontWeight: 800, color: "#0f172a", margin: "0 0 2px", letterSpacing: "-0.03em" }}>AI Mock Interview</h1>
+                <p style={{ color: "#64748b", fontSize: 13, margin: 0 }}>Resume-based questions & AI evaluation</p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setVoiceMode(v => !v)}
-              style={{
-                padding: "5px 14px",
-                borderRadius: 99,
-                border: `1px solid ${voiceMode ? "#c7d2fe" : "#e2e8f0"}`,
-                background: voiceMode ? "#eef2ff" : "#f1f5f9",
-                color: voiceMode ? "#4f46e5" : "#64748b",
-                fontSize: 12.5,
-                fontWeight: 600,
-                cursor: "pointer",
-                transition: "all 0.18s",
-              }}
-            >
-              {voiceMode ? "On" : "Off"}
-            </button>
+
+            {/* Tab Pill Switcher */}
+            <div style={{ display: "flex", background: "#f1f5f9", padding: 3, borderRadius: 10, border: "1px solid #e2e8f0" }}>
+              <button
+                type="button"
+                onClick={() => setSetupTab("new")}
+                style={{
+                  padding: "6px 14px",
+                  borderRadius: 8,
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  border: "none",
+                  background: setupTab === "new" ? "#ffffff" : "transparent",
+                  color: setupTab === "new" ? "#4f46e5" : "#64748b",
+                  boxShadow: setupTab === "new" ? "0 1px 4px rgba(0,0,0,0.05)" : "none",
+                  cursor: "pointer",
+                  transition: "all 0.18s",
+                }}
+              >
+                New Session
+              </button>
+              <button
+                type="button"
+                onClick={() => { setSetupTab("history"); fetchPastSessions(); }}
+                style={{
+                  padding: "6px 14px",
+                  borderRadius: 8,
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  border: "none",
+                  background: setupTab === "history" ? "#ffffff" : "transparent",
+                  color: setupTab === "history" ? "#4f46e5" : "#64748b",
+                  boxShadow: setupTab === "history" ? "0 1px 4px rgba(0,0,0,0.05)" : "none",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  transition: "all 0.18s",
+                }}
+              >
+                <span>History</span>
+                {pastSessions.length > 0 && (
+                  <span style={{ fontSize: 10.5, fontWeight: 700, background: setupTab === "history" ? "#eef2ff" : "#e2e8f0", color: setupTab === "history" ? "#4f46e5" : "#475569", padding: "2px 6px", borderRadius: 99 }}>
+                    {pastSessions.length}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
 
-          {/* Job Role */}
-          <div style={{ marginBottom: 20 }}>
-            <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#334155", marginBottom: 7 }}>Target job role <span style={{ color: "#ef4444" }}>*</span></label>
-            <input
-              type="text"
-              value={jobRole}
-              onChange={(e) => setJobRole(e.target.value)}
-              placeholder="e.g. Frontend Developer, Data Scientist…"
-              className="input-base"
-              style={{ fontSize: 14 }}
-            />
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
-              {POPULAR_ROLES.map(r => (
+          {/* TAB 1: NEW INTERVIEW FORM */}
+          {setupTab === "new" && (
+            <div>
+              {/* Voice toggle */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: "11px 15px", marginBottom: 20 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ color: voiceMode ? "#4f46e5" : "#94a3b8" }}>
+                    {voiceMode ? <Icon.Volume width="17" height="17" /> : <Icon.VolumeX width="17" height="17" />}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>Voice assistant</div>
+                    <div style={{ fontSize: 11.5, color: "#64748b" }}>AI reads questions aloud, transcribes voice answers</div>
+                  </div>
+                </div>
                 <button
-                  key={r}
                   type="button"
-                  onClick={() => setJobRole(r)}
+                  onClick={() => setVoiceMode(v => !v)}
                   style={{
                     padding: "4px 12px",
-                    background: jobRole === r ? "#4f46e5" : "#f1f5f9",
-                    color: jobRole === r ? "#ffffff" : "#475569",
-                    border: jobRole === r ? "1px solid #4f46e5" : "1px solid #e2e8f0",
                     borderRadius: 99,
+                    border: `1px solid ${voiceMode ? "#c7d2fe" : "#e2e8f0"}`,
+                    background: voiceMode ? "#eef2ff" : "#f1f5f9",
+                    color: voiceMode ? "#4f46e5" : "#64748b",
                     fontSize: 12,
-                    fontWeight: 500,
+                    fontWeight: 600,
                     cursor: "pointer",
-                    transition: "all 0.15s",
+                    transition: "all 0.18s",
                   }}
                 >
-                  {r}
+                  {voiceMode ? "Enabled" : "Muted"}
                 </button>
-              ))}
-            </div>
-          </div>
+              </div>
 
-          {/* Resume Upload */}
-          <div style={{ marginBottom: 24 }}>
-            <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#334155", marginBottom: 7 }}>Resume file <span style={{ color: "#ef4444" }}>*</span></label>
-            <div
-              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              style={{
-                border: `2px dashed ${dragOver ? "#4f46e5" : file ? "#a5b4fc" : "#cbd5e1"}`,
-                background: dragOver ? "#eef2ff" : file ? "#fafbff" : "#fafafa",
-                borderRadius: 14,
-                padding: "22px 18px",
-                textAlign: "center",
-                cursor: "pointer",
-                transition: "all 0.2s",
-              }}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                style={{ display: "none" }}
-                onChange={(e) => { if (e.target.files?.[0]) handleFileSelect(e.target.files[0]); }}
-              />
-              {file ? (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
-                  <div style={{ color: "#4f46e5" }}><Icon.FileText width="20" height="20" /></div>
-                  <div style={{ textAlign: "left", flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{file.name}</div>
-                    <div style={{ fontSize: 12, color: "#64748b" }}>{(file.size / 1024).toFixed(1)} KB</div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setFile(null); }}
-                    style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer", padding: 4, display: "flex", alignItems: "center", borderRadius: 6, transition: "color 0.15s" }}
-                    onMouseEnter={e => e.currentTarget.style.color = "#ef4444"}
-                    onMouseLeave={e => e.currentTarget.style.color = "#94a3b8"}
-                  >
-                    <Icon.X width="16" height="16" />
-                  </button>
+              {/* Job Role */}
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#334155", marginBottom: 6 }}>Target job role <span style={{ color: "#ef4444" }}>*</span></label>
+                <input
+                  type="text"
+                  value={jobRole}
+                  onChange={(e) => setJobRole(e.target.value)}
+                  placeholder="e.g. Full Stack Developer, Data Scientist…"
+                  className="input-base"
+                  style={{ fontSize: 14 }}
+                />
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 9 }}>
+                  {POPULAR_ROLES.map(r => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setJobRole(r)}
+                      style={{
+                        padding: "4px 11px",
+                        background: jobRole === r ? "#4f46e5" : "#f1f5f9",
+                        color: jobRole === r ? "#ffffff" : "#475569",
+                        border: jobRole === r ? "1px solid #4f46e5" : "1px solid #e2e8f0",
+                        borderRadius: 99,
+                        fontSize: 11.5,
+                        fontWeight: 500,
+                        cursor: "pointer",
+                        transition: "all 0.15s",
+                      }}
+                    >
+                      {r}
+                    </button>
+                  ))}
                 </div>
-              ) : (
-                <div>
-                  <div style={{ color: "#94a3b8", display: "inline-flex", marginBottom: 8 }}><Icon.Upload width="24" height="24" /></div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#334155", marginBottom: 3 }}>Drop your resume here or click to browse</div>
-                  <div style={{ fontSize: 12, color: "#94a3b8" }}>PDF or DOCX · max 10 MB</div>
+              </div>
+
+              {/* Resume Upload */}
+              <div style={{ marginBottom: 22 }}>
+                <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#334155", marginBottom: 6 }}>Resume file <span style={{ color: "#ef4444" }}>*</span></label>
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    border: `2px dashed ${dragOver ? "#4f46e5" : file ? "#a5b4fc" : "#cbd5e1"}`,
+                    background: dragOver ? "#eef2ff" : file ? "#fafbff" : "#fafafa",
+                    borderRadius: 14,
+                    padding: "20px 16px",
+                    textAlign: "center",
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                  }}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    style={{ display: "none" }}
+                    onChange={(e) => { if (e.target.files?.[0]) handleFileSelect(e.target.files[0]); }}
+                  />
+                  {file ? (
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
+                      <div style={{ color: "#4f46e5" }}><Icon.FileText width="20" height="20" /></div>
+                      <div style={{ textAlign: "left", flex: 1 }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 600, color: "#0f172a" }}>{file.name}</div>
+                        <div style={{ fontSize: 11.5, color: "#64748b" }}>{(file.size / 1024).toFixed(1)} KB · Ready to parse</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setFile(null); }}
+                        style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer", padding: 4, display: "flex", alignItems: "center", borderRadius: 6 }}
+                        onMouseEnter={e => e.currentTarget.style.color = "#ef4444"}
+                        onMouseLeave={e => e.currentTarget.style.color = "#94a3b8"}
+                      >
+                        <Icon.X width="16" height="16" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{ color: "#94a3b8", display: "inline-flex", marginBottom: 6 }}><Icon.Upload width="22" height="22" /></div>
+                      <div style={{ fontSize: 13.5, fontWeight: 600, color: "#334155" }}>Click or drop resume file to begin</div>
+                      <div style={{ fontSize: 11.5, color: "#94a3b8", marginTop: 2 }}>PDF or DOCX format</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Error */}
+              {setupError && (
+                <div style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626", padding: "10px 14px", borderRadius: 10, marginBottom: 16, fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
+                  <Icon.AlertTriangle width="15" height="15" style={{ flexShrink: 0 }} />
+                  {setupError}
                 </div>
               )}
-            </div>
-          </div>
 
-          {/* Error */}
-          {setupError && (
-            <div style={{ background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626", padding: "10px 14px", borderRadius: 10, marginBottom: 16, fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
-              <Icon.AlertTriangle width="16" height="16" style={{ flexShrink: 0 }} />
-              {setupError}
+              <button
+                onClick={handleStart}
+                disabled={starting}
+                className="btn-primary"
+                style={{ width: "100%", padding: "12px", fontSize: 14.5, borderRadius: 11 }}
+              >
+                {starting ? <><span className="spinner" />Generating 10 questions…</> : <>Start Mock Interview <Icon.ArrowRight width="16" height="16" /></>}
+              </button>
             </div>
           )}
 
-          <button
-            onClick={handleStart}
-            disabled={starting}
-            className="btn-primary"
-            style={{ width: "100%", padding: "13px", fontSize: 15, borderRadius: 12 }}
-          >
-            {starting ? <><span className="spinner" />Generating questions…</> : <>Start Interview <Icon.ArrowRight width="16" height="16" /></>}
-          </button>
+          {/* TAB 2: INTERVIEW HISTORY LIST */}
+          {setupTab === "history" && (
+            <div style={{ animation: "fadeIn 0.25s ease" }}>
+              {loadingHistory ? (
+                <div style={{ textAlign: "center", padding: "36px 0", color: "#64748b", fontSize: 13.5 }}>
+                  <span className="spinner spinner-dark" style={{ marginRight: 8 }} />
+                  Loading interview records…
+                </div>
+              ) : pastSessions.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "36px 16px", background: "#f8fafc", borderRadius: 14, border: "1.5px dashed #cbd5e1" }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 12, background: "#eef2ff", color: "#4f46e5", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px" }}>
+                    <Icon.History width="20" height="20" />
+                  </div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", marginBottom: 4 }}>No past interviews found</div>
+                  <p style={{ fontSize: 13, color: "#64748b", margin: "0 0 16px" }}>Take your first practice session to get scored feedback and track progress.</p>
+                  <button
+                    onClick={() => setSetupTab("new")}
+                    className="btn-primary"
+                    style={{ padding: "8px 18px", fontSize: 13, borderRadius: 9 }}
+                  >
+                    Start an Interview →
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 420, overflowY: "auto", paddingRight: 4 }}>
+                  {pastSessions.map((s) => {
+                    const score = s.overall_score !== null ? Number(s.overall_score).toFixed(1) : null;
+                    return (
+                      <div
+                        key={s.id}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 12,
+                          padding: "12px 14px",
+                          background: "#f8fafc",
+                          border: "1px solid #e2e8f0",
+                          borderRadius: 12,
+                          transition: "all 0.18s",
+                        }}
+                      >
+                        {/* Left score + info */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flex: 1 }}>
+                          {score !== null ? (
+                            <div style={{ width: 40, height: 40, borderRadius: 10, background: scoreBg(Number(score)), border: `1px solid ${scoreBorder(Number(score))}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                              <div style={{ fontSize: 13.5, fontWeight: 800, color: scoreColor(Number(score)), lineHeight: 1 }}>{score}</div>
+                              <div style={{ fontSize: 9, color: "#64748b", fontWeight: 600 }}>/10</div>
+                            </div>
+                          ) : (
+                            <div style={{ width: 40, height: 40, borderRadius: 10, background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8", fontSize: 14, flexShrink: 0 }}>
+                              —
+                            </div>
+                          )}
+
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ fontSize: 13.5, fontWeight: 700, color: "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                              {s.job_role}
+                            </div>
+                            <div style={{ fontSize: 11.5, color: "#64748b", marginTop: 2, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                              <span>{new Date(s.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</span>
+                              <span>•</span>
+                              <span>{s.answered_count || 0}/{s.question_count || 10} questions</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Right action button */}
+                        <button
+                          onClick={() => handleViewPastDetail(s.id)}
+                          disabled={loadingDetailId === s.id}
+                          className="btn-secondary"
+                          style={{ padding: "6px 12px", fontSize: 12, borderRadius: 8, flexShrink: 0 }}
+                        >
+                          {loadingDetailId === s.id ? <span className="spinner spinner-dark" /> : "Review →"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
         </div>
       </div>
     );
@@ -618,7 +820,7 @@ export default function MockInterview() {
         <div style={{ ...page, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div style={{ background: "#fff", borderRadius: 18, padding: 36, maxWidth: 440, textAlign: "center", border: "1px solid #e2e8f0" }}>
             <p style={{ color: "#dc2626", fontSize: 14, marginBottom: 16 }}>⚠️ {summary.error}</p>
-            <button onClick={() => navigate("/dashboard")} className="btn-primary" style={{ padding: "10px 24px", fontSize: 14, borderRadius: 10 }}>Back to Dashboard</button>
+            <button onClick={resetAll} className="btn-primary" style={{ padding: "10px 24px", fontSize: 14, borderRadius: 10 }}>Back to Interviews</button>
           </div>
         </div>
       );
@@ -634,7 +836,7 @@ export default function MockInterview() {
           <div style={{ background: "linear-gradient(145deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)", borderRadius: 20, padding: "clamp(28px,5vw,48px)", textAlign: "center", marginBottom: 18, color: "#fff", position: "relative", overflow: "hidden" }}>
             <div style={{ position: "absolute", top: "-40px", right: "-40px", width: 180, height: 180, borderRadius: "50%", background: "rgba(255,255,255,0.04)" }} />
             <div style={{ position: "relative" }}>
-              <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", opacity: 0.6, marginBottom: 12 }}>Interview Complete</div>
+              <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", opacity: 0.6, marginBottom: 12 }}>Interview Evaluation</div>
               <div style={{ fontSize: "clamp(52px,10vw,80px)", fontWeight: 900, lineHeight: 1, marginBottom: 4 }}>{overall}</div>
               <div style={{ fontSize: 14, opacity: 0.7, marginBottom: 16 }}>out of 10</div>
               <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 99, padding: "5px 14px", fontSize: 13, fontWeight: 500 }}>
@@ -694,7 +896,7 @@ export default function MockInterview() {
           {/* Actions */}
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <button onClick={resetAll} className="btn-primary" style={{ flex: 1, minWidth: 160, padding: "12px", fontSize: 14, borderRadius: 11, gap: 7 }}>
-              <Icon.RotateCcw width="15" height="15" /> New Interview
+              <Icon.RotateCcw width="15" height="15" /> Back to Interviews
             </button>
             <button onClick={() => { stopSpeaking(); stopListening(); navigate("/dashboard"); }} className="btn-secondary" style={{ flex: 1, minWidth: 160, padding: "12px", fontSize: 14, borderRadius: 11, gap: 7 }}>
               <Icon.Grid width="15" height="15" /> Dashboard

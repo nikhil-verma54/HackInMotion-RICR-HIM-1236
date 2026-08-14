@@ -541,3 +541,50 @@ def interview_history(request):
         })
 
     return Response({"interviews": data}, status=status.HTTP_200_OK)
+
+
+@api_view(["GET"])
+@authentication_classes([FirebaseAuthentication, SessionAuthentication])
+@permission_classes([IsAuthenticated])
+def interview_detail(request, interview_id):
+    """Return full details, question breakdown, and summary of a past interview."""
+    try:
+        interview = MockInterview.objects.get(id=interview_id, user=request.user)
+    except MockInterview.DoesNotExist:
+        return Response({"error": "Interview session not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    import json as _json
+    summary_obj = None
+    if interview.performance_summary:
+        try:
+            summary_obj = _json.loads(interview.performance_summary)
+        except Exception:
+            pass
+
+    questions = []
+    for q in interview.questions.all().order_by("order"):
+        fb = None
+        if q.feedback:
+            try:
+                fb = _json.loads(q.feedback)
+            except Exception:
+                pass
+        questions.append({
+            "id": q.id,
+            "question": q.question_text,
+            "category": q.category,
+            "difficulty": q.difficulty,
+            "user_answer": q.user_answer,
+            "score": q.score,
+            "feedback": fb,
+        })
+
+    return Response({
+        "id": interview.id,
+        "job_role": interview.job_role,
+        "status": interview.status,
+        "overall_score": interview.overall_score,
+        "created_at": interview.created_at.isoformat(),
+        "summary": summary_obj,
+        "questions": questions,
+    }, status=status.HTTP_200_OK)
