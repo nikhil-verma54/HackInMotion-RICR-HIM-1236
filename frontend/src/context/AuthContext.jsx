@@ -23,10 +23,10 @@ const AuthContext = createContext(null);
 const googleProvider = new GoogleAuthProvider();
 
 // =====================================================
-// DJANGO BACKEND
+// DJANGO BACKEND (use relative paths so Vite proxy forwards requests)
 // =====================================================
 
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = "";
 
 // =====================================================
 // AUTH PROVIDER
@@ -196,10 +196,19 @@ export function AuthProvider({ children }) {
           `Bearer ${idToken}`
         );
 
+        let body = options.body;
+        if (
+          body &&
+          !(body instanceof FormData) &&
+          typeof body === "object"
+        ) {
+          body = JSON.stringify(body);
+        }
+
         // Only set Content-Type if a body exists, is not FormData,
         // and caller hasn't already specified it.
         if (
-          options.body &&
+          body &&
           !headers.has("Content-Type") &&
           !(options.body instanceof FormData)
         ) {
@@ -227,6 +236,7 @@ export function AuthProvider({ children }) {
           `${API_URL}${endpoint}`,
           {
             ...options,
+            body,
             headers,
             // Include credentials to allow session-based fallback
             credentials: "include",
