@@ -119,6 +119,21 @@ export default function Navbar() {
               Dashboard
             </Link>
           )}
+
+          {user && (
+            <Link
+              to="/interview"
+              style={{
+                fontSize: 14,
+                fontWeight: isActive("/interview") ? 700 : 500,
+                color: isActive("/interview") ? "#4f46e5" : "#475569",
+                textDecoration: "none",
+                transition: "color 0.2s",
+              }}
+            >
+              Interview
+            </Link>
+          )}
         </nav>
 
         {/* Right side: User Profile / Auth buttons */}

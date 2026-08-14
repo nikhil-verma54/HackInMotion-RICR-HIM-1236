@@ -179,6 +179,10 @@ export default function Dashboard() {
   const [pastAnalyses, setPastAnalyses] = useState([]);
   const [loadingDashboard, setLoadingDashboard] = useState(true);
 
+  // Interview history state
+  const [pastInterviews, setPastInterviews] = useState([]);
+  const [loadingInterviews, setLoadingInterviews] = useState(false);
+
   // Upload & Active Scan State
   const [file, setFile] = useState(null);
   const [jobDescription, setJobDescription] = useState("");
@@ -206,9 +210,25 @@ export default function Dashboard() {
     }
   }, [djangoRequest]);
 
+  // Fetch interview history
+  const fetchInterviewHistory = useCallback(async () => {
+    try {
+      setLoadingInterviews(true);
+      const res = await djangoRequest("/api/resume/interview/history/");
+      if (res && res.interviews) {
+        setPastInterviews(res.interviews);
+      }
+    } catch (err) {
+      console.error("Failed to load interview history:", err);
+    } finally {
+      setLoadingInterviews(false);
+    }
+  }, [djangoRequest]);
+
   useEffect(() => {
     fetchDashboardData();
-  }, [fetchDashboardData]);
+    fetchInterviewHistory();
+  }, [fetchDashboardData, fetchInterviewHistory]);
 
   const handleLogout = async () => {
     await logout();
@@ -811,6 +831,98 @@ export default function Dashboard() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── MOCK INTERVIEW SECTION ── */}
+        <div style={{ marginTop: 40 }}>
+          {/* Section header */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+            <div>
+              <h2 style={{ fontSize: "clamp(18px,3vw,22px)", fontWeight: 800, color: "#0f172a", margin: 0 }}>🎙️ Mock Interviews</h2>
+              <p style={{ color: "#64748b", fontSize: 14, margin: "4px 0 0" }}>AI-powered interview practice tailored to your resume</p>
+            </div>
+            <button
+              onClick={() => navigate("/interview")}
+              style={{ padding: "10px 22px", background: "linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%)", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
+            >
+              ＋ Start New Interview
+            </button>
+          </div>
+
+          {loadingInterviews ? (
+            <div style={{ textAlign: "center", padding: "32px", color: "#94a3b8" }}>Loading interview history…</div>
+          ) : pastInterviews.length === 0 ? (
+            <div style={{ background: "#fff", borderRadius: 16, padding: "clamp(28px,5vw,48px)", textAlign: "center", border: "1.5px dashed #c7d2fe" }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>🎙️</div>
+              <h3 style={{ fontSize: 18, fontWeight: 700, color: "#0f172a", margin: "0 0 8px" }}>No interviews yet</h3>
+              <p style={{ color: "#64748b", margin: "0 0 20px", fontSize: 14 }}>Practice answering interview questions and get instant AI feedback</p>
+              <button
+                onClick={() => navigate("/interview")}
+                style={{ padding: "12px 28px", background: "linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%)", color: "#fff", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 700, cursor: "pointer" }}
+              >
+                Start Your First Interview →
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {pastInterviews.map((iv) => {
+                const ivScore = iv.overall_score !== null ? Number(iv.overall_score).toFixed(1) : null;
+                const ivScoreColor = ivScore >= 7 ? "#16a34a" : ivScore >= 5 ? "#d97706" : "#dc2626";
+                const ivScoreBg = ivScore >= 7 ? "#dcfce7" : ivScore >= 5 ? "#fef3c7" : "#fee2e2";
+                return (
+                  <div
+                    key={iv.id}
+                    className="card-base card-hover"
+                    style={{ padding: "18px 22px", display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", cursor: "default" }}
+                  >
+                    {/* Score badge */}
+                    {ivScore !== null ? (
+                      <div style={{ background: ivScoreBg, borderRadius: 12, padding: "10px 14px", textAlign: "center", flexShrink: 0 }}>
+                        <div style={{ fontSize: 20, fontWeight: 800, color: ivScoreColor }}>{ivScore}</div>
+                        <div style={{ fontSize: 10, color: "#64748b", fontWeight: 600 }}>/ 10</div>
+                      </div>
+                    ) : (
+                      <div style={{ background: "#f1f5f9", borderRadius: 12, padding: "10px 14px", textAlign: "center", flexShrink: 0 }}>
+                        <div style={{ fontSize: 14, color: "#94a3b8" }}>—</div>
+                      </div>
+                    )}
+
+                    {/* Info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 15, color: "#0f172a", marginBottom: 4 }}>{iv.job_role}</div>
+                      <div style={{ fontSize: 13, color: "#64748b", display: "flex", gap: 12, flexWrap: "wrap" }}>
+                        <span>{iv.answered_count}/{iv.question_count} questions answered</span>
+                        <span>•</span>
+                        <span>{new Date(iv.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                      </div>
+                      {iv.verdict && (
+                        <p style={{ fontSize: 12, color: "#94a3b8", marginTop: 4, lineHeight: 1.5, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical" }}>
+                          {iv.verdict}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Status pill + action */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                      <span style={{
+                        fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 99,
+                        background: iv.status === "completed" ? "#dcfce7" : "#fef3c7",
+                        color: iv.status === "completed" ? "#15803d" : "#b45309"
+                      }}>
+                        {iv.status === "completed" ? "Completed" : "In Progress"}
+                      </span>
+                      <button
+                        onClick={() => navigate("/interview")}
+                        style={{ fontSize: 13, fontWeight: 600, color: "#4f46e5", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+                      >
+                        Practice Again →
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
