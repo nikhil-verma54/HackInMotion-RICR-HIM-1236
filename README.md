@@ -11,6 +11,15 @@
 | 🖥️ **Frontend (Vercel)** | [hack-in-motion-ricr-him-1236-b8so-two.vercel.app](https://hack-in-motion-ricr-him-1236-b8so-two.vercel.app) |
 | ⚙️ **Backend API (Render)** | [hackinmotion-ricr-him-1236.onrender.com](https://hackinmotion-ricr-him-1236.onrender.com) |
 
+### 🔑 Demo Login Credentials
+
+For quick evaluation, you can log in using these test credentials (or sign up with any email/Google account):
+
+| Field | Value |
+|---|---|
+| **Email** | `nikkcr3141@gmail.com` |
+| **Password** | `NikhiL@54` |
+
 > **Note**: The backend is hosted on Render's free tier and may take **30–60 seconds to wake up** on first request after inactivity.
 
 ---
