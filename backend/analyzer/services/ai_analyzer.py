@@ -1,18 +1,102 @@
 import json
+import re
 
 from django.conf import settings
 from google import genai
 
+from .resume_schema import RESUME_SCHEMA
 
-client = genai.Client(
-    api_key=settings.GEMINI_API_KEY
-)
+client = genai.Client(api_key=settings.GEMINI_API_KEY)
+PRIMARY_MODEL = getattr(settings, "GEMINI_MODEL", "gemini-flash-latest")
+FALLBACK_MODELS = [PRIMARY_MODEL, "gemini-flash-latest", "gemini-flash-lite-latest"]
+# Deduplicate while preserving order
+MODELS_TO_TRY = list(dict.fromkeys(FALLBACK_MODELS))
 
-MODEL_NAME = settings.GEMINI_MODEL
+
+def _clean_json_str(raw: str):
+    """Safely cleans and extracts JSON from Gemini output."""
+    raw = raw.strip()
+    if "```" in raw:
+        match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", raw)
+        if match:
+            raw = match.group(1).strip()
+
+    first_bracket = min([i for i in [raw.find("["), raw.find("{")] if i != -1], default=-1)
+    if first_bracket != -1:
+        if raw[first_bracket] == "[":
+            last_bracket = raw.rfind("]")
+        else:
+            last_bracket = raw.rfind("}")
+        if last_bracket != -1:
+            raw = raw[first_bracket : last_bracket + 1]
+
+    return json.loads(raw)
 
 
-def analyze_resume(resume_text, job_description=None):
-    
+def _generate_with_fallback(contents, config=None):
+    """Generate content trying primary model first, falling back to backup models on 404/503/429."""
+    last_error = None
+    for model_name in MODELS_TO_TRY:
+        try:
+            if config:
+                return client.models.generate_content(
+                    model=model_name,
+                    contents=contents,
+                    config=config,
+                )
+            return client.models.generate_content(
+                model=model_name,
+                contents=contents,
+            )
+        except Exception as exc:
+            last_error = exc
+            continue
+    raise last_error
+
+
+# ---------------------------------------------------------------------------
+# STRUCTURED RESUME EXTRACTION
+# Uses RESUME_SCHEMA to extract name, skills, experience, education, projects.
+# ---------------------------------------------------------------------------
+
+
+def parse_resume_structure(resume_text: str) -> dict:
+    """
+    Convert raw resume text into structured JSON using RESUME_SCHEMA.
+    Returns a dict with keys: name, email, phone, summary, skills,
+    education, experience, projects, certifications, achievements.
+    Falls back to an empty dict on failure so callers are never broken.
+    """
+    if not resume_text or not resume_text.strip():
+        return {}
+
+    prompt = (
+        "Extract structured information from the resume below. "
+        "Return only the fields you can find evidence for; leave optional fields empty.\n\n"
+        f"RESUME:\n{resume_text}"
+    )
+
+    try:
+        response = _generate_with_fallback(
+            contents=prompt,
+            config={
+                "response_mime_type": "application/json",
+                "response_schema": RESUME_SCHEMA,
+            },
+        )
+        return _clean_json_str(response.text)
+    except Exception:
+        # Structured extraction is additive — never crash the main pipeline.
+        return {}
+
+
+# ---------------------------------------------------------------------------
+# AI ANALYSIS (JD match, scoring, gap analysis, suggestions)
+# ---------------------------------------------------------------------------
+
+
+def analyze_resume(resume_text: str, job_description: str | None = None) -> dict:
+
     if job_description:
         evaluation_mode = f"""
 Evaluate the resume against the provided Job Description.
@@ -182,216 +266,84 @@ RESUME:
 Return ONLY valid JSON matching the requested response schema.
 """
 
-    response = client.models.generate_content(
-        model=MODEL_NAME,
-        contents=prompt,
-        config={
-            "response_mime_type": "application/json",
-            "response_schema": {
-                "type": "OBJECT",
-                "properties": {
-
-                    "overall_score": {
-                        "type": "NUMBER"
-                    },
-
-                    "summary": {
-                        "type": "STRING"
-                    },
-
-                    "scores": {
-                        "type": "OBJECT",
-                        "properties": {
-
-                            "ats_compatibility": {
-                                "type": "NUMBER"
-                            },
-
-                            "skills_quality": {
-                                "type": "NUMBER"
-                            },
-
-                            "experience_quality": {
-                                "type": "NUMBER"
-                            },
-
-                            "project_quality": {
-                                "type": "NUMBER"
-                            },
-
-                            "achievement_impact": {
-                                "type": "NUMBER"
-                            },
-
-                            "education_certifications": {
-                                "type": "NUMBER"
-                            },
-
-                            "structure_completeness": {
-                                "type": "NUMBER"
-                            },
-
-                            "writing_quality": {
-                                "type": "NUMBER"
-                            },
-
-                            "technical_depth": {
-                                "type": "NUMBER"
-                            },
-
-                            "career_relevance": {
-                                "type": "NUMBER"
-                            }
-                        }
-                    },
-
-                    "score_explanations": {
-                        "type": "OBJECT",
-                        "properties": {
-
-                            "ats_compatibility": {
-                                "type": "STRING"
-                            },
-
-                            "skills_quality": {
-                                "type": "STRING"
-                            },
-
-                            "experience_quality": {
-                                "type": "STRING"
-                            },
-
-                            "project_quality": {
-                                "type": "STRING"
-                            },
-
-                            "achievement_impact": {
-                                "type": "STRING"
-                            },
-
-                            "education_certifications": {
-                                "type": "STRING"
-                            },
-
-                            "structure_completeness": {
-                                "type": "STRING"
-                            },
-
-                            "writing_quality": {
-                                "type": "STRING"
-                            },
-
-                            "technical_depth": {
-                                "type": "STRING"
-                            },
-
-                            "career_relevance": {
-                                "type": "STRING"
-                            }
-                        }
-                    },
-
-                    "strengths": {
-                        "type": "ARRAY",
-                        "items": {
-                            "type": "STRING"
-                        }
-                    },
-
-                    "weaknesses": {
-                        "type": "ARRAY",
-                        "items": {
-                            "type": "STRING"
-                        }
-                    },
-
-                    "suggestions": {
-                        "type": "ARRAY",
-                        "items": {
-                            "type": "STRING"
-                        }
-                    },
-
-                    "missing_skills": {
-                        "type": "ARRAY",
-                        "items": {
-                            "type": "STRING"
-                        }
-                    },
-
-                    "skill_analysis": {
-                        "type": "ARRAY",
-                        "items": {
+    try:
+        response = _generate_with_fallback(
+            contents=prompt,
+            config={
+                "response_mime_type": "application/json",
+                "response_schema": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "overall_score": {"type": "NUMBER"},
+                        "summary": {"type": "STRING"},
+                        "scores": {
                             "type": "OBJECT",
                             "properties": {
-
-                                "skill": {
-                                    "type": "STRING"
+                                "ats_compatibility": {"type": "NUMBER"},
+                                "skills_quality": {"type": "NUMBER"},
+                                "experience_quality": {"type": "NUMBER"},
+                                "project_quality": {"type": "NUMBER"},
+                                "achievement_impact": {"type": "NUMBER"},
+                                "education_certifications": {"type": "NUMBER"},
+                                "structure_completeness": {"type": "NUMBER"},
+                                "writing_quality": {"type": "NUMBER"},
+                                "technical_depth": {"type": "NUMBER"},
+                                "career_relevance": {"type": "NUMBER"},
+                            },
+                        },
+                        "score_explanations": {
+                            "type": "OBJECT",
+                            "properties": {
+                                "ats_compatibility": {"type": "STRING"},
+                                "skills_quality": {"type": "STRING"},
+                                "experience_quality": {"type": "STRING"},
+                                "project_quality": {"type": "STRING"},
+                                "achievement_impact": {"type": "STRING"},
+                                "education_certifications": {"type": "STRING"},
+                                "structure_completeness": {"type": "STRING"},
+                                "writing_quality": {"type": "STRING"},
+                                "technical_depth": {"type": "STRING"},
+                                "career_relevance": {"type": "STRING"},
+                            },
+                        },
+                        "strengths": {"type": "ARRAY", "items": {"type": "STRING"}},
+                        "weaknesses": {"type": "ARRAY", "items": {"type": "STRING"}},
+                        "suggestions": {"type": "ARRAY", "items": {"type": "STRING"}},
+                        "missing_skills": {"type": "ARRAY", "items": {"type": "STRING"}},
+                        "skill_analysis": {
+                            "type": "ARRAY",
+                            "items": {
+                                "type": "OBJECT",
+                                "properties": {
+                                    "skill": {"type": "STRING"},
+                                    "status": {"type": "STRING"},
+                                    "evidence": {"type": "STRING"},
+                                    "importance": {"type": "STRING"},
                                 },
-
-                                "status": {
-                                    "type": "STRING"
+                            },
+                        },
+                        "job_match": {
+                            "type": "OBJECT",
+                            "properties": {
+                                "applicable": {"type": "BOOLEAN"},
+                                "match_score": {"type": "NUMBER"},
+                                "matched_skills": {"type": "ARRAY", "items": {"type": "STRING"}},
+                                "partial_skills": {"type": "ARRAY", "items": {"type": "STRING"}},
+                                "missing_required_skills": {
+                                    "type": "ARRAY",
+                                    "items": {"type": "STRING"},
                                 },
-
-                                "evidence": {
-                                    "type": "STRING"
+                                "missing_preferred_skills": {
+                                    "type": "ARRAY",
+                                    "items": {"type": "STRING"},
                                 },
-
-                                "importance": {
-                                    "type": "STRING"
-                                }
-                            }
-                        }
+                                "explanation": {"type": "STRING"},
+                            },
+                        },
                     },
-
-                    "job_match": {
-                        "type": "OBJECT",
-                        "properties": {
-
-                            "applicable": {
-                                "type": "BOOLEAN"
-                            },
-
-                            "match_score": {
-                                "type": "NUMBER"
-                            },
-
-                            "matched_skills": {
-                                "type": "ARRAY",
-                                "items": {
-                                    "type": "STRING"
-                                }
-                            },
-
-                            "partial_skills": {
-                                "type": "ARRAY",
-                                "items": {
-                                    "type": "STRING"
-                                }
-                            },
-
-                            "missing_required_skills": {
-                                "type": "ARRAY",
-                                "items": {
-                                    "type": "STRING"
-                                }
-                            },
-
-                            "missing_preferred_skills": {
-                                "type": "ARRAY",
-                                "items": {
-                                    "type": "STRING"
-                                }
-                            },
-
-                            "explanation": {
-                                "type": "STRING"
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    )
-
-    return json.loads(response.text)
+                },
+            },
+        )
+        return _clean_json_str(response.text)
+    except Exception as exc:
+        raise RuntimeError(f"Gemini analysis failed: {exc}") from exc

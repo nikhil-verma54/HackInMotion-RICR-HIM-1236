@@ -1,4 +1,4 @@
-import fitz
+import pymupdf as fitz
 from docx import Document
 
 
@@ -21,10 +21,6 @@ def extract_docx_text(file):
         file.seek(0)
     document = Document(file)
 
-    text = "\n".join(
-        paragraph.text
-        for paragraph in document.paragraphs
-        if paragraph.text.strip()
-    )
+    text = "\n".join(paragraph.text for paragraph in document.paragraphs if paragraph.text.strip())
 
     return text.strip()
