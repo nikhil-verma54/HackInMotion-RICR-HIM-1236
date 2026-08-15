@@ -28,10 +28,7 @@ export default function Navbar() {
   });
 
   return (
-    <header
-      className="navbar"
-      style={{ padding: "0 clamp(16px, 3vw, 32px)", height: 62 }}
-    >
+    <header className="navbar" style={{ padding: "0 clamp(16px, 3vw, 32px)", height: 62 }}>
       <div
         style={{
           maxWidth: 1160,
@@ -47,7 +44,13 @@ export default function Navbar() {
         {/* Brand */}
         <Link
           to="/"
-          style={{ display: "flex", alignItems: "center", gap: 9, textDecoration: "none", flexShrink: 0 }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 9,
+            textDecoration: "none",
+            flexShrink: 0,
+          }}
         >
           <div
             style={{
@@ -66,17 +69,31 @@ export default function Navbar() {
           >
             ✦
           </div>
-          <span style={{ fontSize: 17, fontWeight: 800, color: "#0f172a", letterSpacing: "-0.03em" }}>
+          <span
+            style={{ fontSize: 17, fontWeight: 800, color: "#0f172a", letterSpacing: "-0.03em" }}
+          >
             Vettora
           </span>
         </Link>
 
         {/* Center nav */}
         <nav style={{ display: "flex", alignItems: "center", gap: "clamp(18px, 3vw, 32px)" }}>
-          <Link to="/" style={navLinkStyle("/")}>Home</Link>
-          <Link to="/about" style={navLinkStyle("/about")}>About</Link>
-          {user && <Link to="/dashboard" style={navLinkStyle("/dashboard")}>Dashboard</Link>}
-          {user && <Link to="/interview" style={navLinkStyle("/interview")}>Interview</Link>}
+          <Link to="/" style={navLinkStyle("/")}>
+            Home
+          </Link>
+          <Link to="/about" style={navLinkStyle("/about")}>
+            About
+          </Link>
+          {user && (
+            <Link to="/dashboard" style={navLinkStyle("/dashboard")}>
+              Dashboard
+            </Link>
+          )}
+          {user && (
+            <Link to="/interview" style={navLinkStyle("/interview")}>
+              Interview
+            </Link>
+          )}
         </nav>
 
         {/* Right side */}
@@ -161,7 +178,12 @@ export default function Navbar() {
               <Link
                 to="/register"
                 className="btn-primary"
-                style={{ padding: "8px 18px", fontSize: 13.5, textDecoration: "none", borderRadius: 9 }}
+                style={{
+                  padding: "8px 18px",
+                  fontSize: 13.5,
+                  textDecoration: "none",
+                  borderRadius: 9,
+                }}
               >
                 Get Started
               </Link>

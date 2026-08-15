@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 // ============================================================
@@ -29,7 +29,16 @@ function ScoreRing({ score, size = 135, strokeWidth = 10, label }) {
   const color = scoreColor(score);
 
   return (
-    <div style={{ position: "relative", width: size, height: size, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+    <div
+      style={{
+        position: "relative",
+        width: size,
+        height: size,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
       <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
         <circle
           cx={size / 2}
@@ -59,7 +68,9 @@ function ScoreRing({ score, size = 135, strokeWidth = 10, label }) {
           {Math.round(score)}
         </div>
         {label && (
-          <div style={{ fontSize: 11, color: "#64748b", fontWeight: 600, marginTop: 4 }}>{label}</div>
+          <div style={{ fontSize: 11, color: "#64748b", fontWeight: 600, marginTop: 4 }}>
+            {label}
+          </div>
         )}
       </div>
     </div>
@@ -82,12 +93,8 @@ function ScoreBar({ label, score, explanation }) {
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{ flex: 1 }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#334155" }}>
-              {label}
-            </span>
-            <span style={{ fontSize: 13, fontWeight: 800, color }}>
-              {Math.round(score)}%
-            </span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#334155" }}>{label}</span>
+            <span style={{ fontSize: 13, fontWeight: 800, color }}>{Math.round(score)}%</span>
           </div>
           <div className="progress-bar-track">
             <div
@@ -99,10 +106,29 @@ function ScoreBar({ label, score, explanation }) {
             />
           </div>
         </div>
-        <span style={{ fontSize: 13, color: "#94a3b8", transition: "transform 0.2s", transform: expanded ? "rotate(180deg)" : "none" }}>▾</span>
+        <span
+          style={{
+            fontSize: 13,
+            color: "#94a3b8",
+            transition: "transform 0.2s",
+            transform: expanded ? "rotate(180deg)" : "none",
+          }}
+        >
+          ▾
+        </span>
       </div>
       {expanded && explanation && (
-        <p style={{ marginTop: 10, fontSize: 12, color: "#64748b", lineHeight: 1.6, borderTop: "1px solid #f1f5f9", paddingTop: 8, margin: "10px 0 0" }}>
+        <p
+          style={{
+            marginTop: 10,
+            fontSize: 12,
+            color: "#64748b",
+            lineHeight: 1.6,
+            borderTop: "1px solid #f1f5f9",
+            paddingTop: 8,
+            margin: "10px 0 0",
+          }}
+        >
           {explanation}
         </p>
       )}
@@ -118,13 +144,19 @@ function SkillBadge({ skill, status }) {
     status?.toLowerCase() === "matched"
       ? "skill-matched"
       : status?.toLowerCase() === "partial"
-      ? "skill-partial"
-      : "skill-missing";
+        ? "skill-partial"
+        : "skill-missing";
 
   return (
     <span
       className={cls}
-      style={{ display: "inline-block", padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600 }}
+      style={{
+        display: "inline-block",
+        padding: "4px 12px",
+        borderRadius: 20,
+        fontSize: 12,
+        fontWeight: 600,
+      }}
     >
       {skill}
     </span>
@@ -137,14 +169,24 @@ function SkillBadge({ skill, status }) {
 function ListSection({ title, items, icon, bg, border, textColor }) {
   if (!items?.length) return null;
   return (
-    <div style={{ background: bg, border: `1px solid ${border}`, borderRadius: 16, padding: "20px 22px" }}>
+    <div
+      style={{
+        background: bg,
+        border: `1px solid ${border}`,
+        borderRadius: 16,
+        padding: "20px 22px",
+      }}
+    >
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
         <span style={{ fontSize: 16 }}>{icon}</span>
         <h4 style={{ fontSize: 15, fontWeight: 700, color: textColor, margin: 0 }}>{title}</h4>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {items.map((item, i) => (
-          <div key={i} style={{ display: "flex", gap: 10, fontSize: 14, color: textColor, lineHeight: 1.6 }}>
+          <div
+            key={i}
+            style={{ display: "flex", gap: 10, fontSize: 14, color: textColor, lineHeight: 1.6 }}
+          >
             <span style={{ flexShrink: 0 }}>•</span>
             <span>{item}</span>
           </div>
@@ -171,7 +213,7 @@ const SCORE_LABELS = {
 // DASHBOARD
 // ============================================================
 export default function Dashboard() {
-  const { user, logout, djangoRequest } = useAuth();
+  const { user, djangoRequest } = useAuth();
   const navigate = useNavigate();
 
   // Dashboard Data State
@@ -230,11 +272,6 @@ export default function Dashboard() {
     fetchInterviewHistory();
   }, [fetchDashboardData, fetchInterviewHistory]);
 
-  const handleLogout = async () => {
-    await logout();
-    navigate("/login", { replace: true });
-  };
-
   const handleFile = (f) => {
     if (!f) return;
     if (!f.name.match(/\.(pdf|docx)$/i)) {
@@ -258,6 +295,16 @@ export default function Dashboard() {
       setError("Please select a resume file first.");
       return;
     }
+
+    // Frontend JD guard — never send an empty job description
+    if (!jobDescription || !jobDescription.trim()) {
+      setError(
+        "Please provide a job description before analyzing. " +
+          "A job description is required to calculate your match score."
+      );
+      return;
+    }
+
     setError("");
     setAnalyzing(true);
     setActiveAnalysis(null);
@@ -265,9 +312,8 @@ export default function Dashboard() {
     try {
       const formData = new FormData();
       formData.append("resume", file);
-      if (jobDescription.trim()) {
-        formData.append("job_description", jobDescription.trim());
-      }
+      // Always send the trimmed JD — backend also validates
+      formData.append("job_description", jobDescription.trim());
 
       const data = await djangoRequest("/api/resume/analyze/", {
         method: "POST",
@@ -300,7 +346,7 @@ export default function Dashboard() {
         setActiveTab("overview");
         window.scrollTo({ top: 400, behavior: "smooth" });
       }
-    } catch (err) {
+    } catch {
       setError("Could not load past analysis details.");
     }
   };
@@ -324,48 +370,73 @@ export default function Dashboard() {
     }
   };
 
-  const avatarUrl = user?.photoURL;
-  const displayName = dashboardData?.user?.name || user?.displayName || user?.email?.split("@")[0] || "User";
-  const initials = displayName.slice(0, 2).toUpperCase();
+  const displayName =
+    dashboardData?.user?.name || user?.displayName || user?.email?.split("@")[0] || "User";
 
   return (
     <div style={{ minHeight: "calc(100vh - 68px)", background: "#f8fafc", color: "#0f172a" }}>
-
       {/* ── MAIN CONTAINER ── */}
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "36px 24px 60px" }}>
-
         {/* ── USER STATS OVERVIEW ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 28 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: 16,
+            marginBottom: 28,
+          }}
+        >
           <div className="card-base" style={{ padding: "20px 22px", background: "#ffffff" }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5 }}>
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: "#64748b",
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+              }}
+            >
               Account Profile
             </div>
             <div style={{ fontSize: 18, fontWeight: 800, color: "#0f172a", marginTop: 4 }}>
               {displayName}
             </div>
-            <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
-              {user?.email}
-            </div>
+            <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>{user?.email}</div>
           </div>
 
           <div className="card-base" style={{ padding: "20px 22px", background: "#ffffff" }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5 }}>
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: "#64748b",
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+              }}
+            >
               Total Resumes Scanned
             </div>
             <div style={{ fontSize: 24, fontWeight: 800, color: "#4f46e5", marginTop: 4 }}>
               {dashboardData?.stats?.total_scans ?? 0}
             </div>
-            <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
-              Saved in history
-            </div>
+            <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>Saved in history</div>
           </div>
 
           <div className="card-base" style={{ padding: "20px 22px", background: "#ffffff" }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5 }}>
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: "#64748b",
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+              }}
+            >
               Highest Score
             </div>
             <div style={{ fontSize: 24, fontWeight: 800, color: "#10b981", marginTop: 4 }}>
-              {dashboardData?.stats?.highest_score !== null && dashboardData?.stats?.highest_score !== undefined
+              {dashboardData?.stats?.highest_score !== null &&
+              dashboardData?.stats?.highest_score !== undefined
                 ? `${dashboardData.stats.highest_score}%`
                 : "—"}
             </div>
@@ -385,11 +456,20 @@ export default function Dashboard() {
           </div>
 
           <div className="card-base" style={{ padding: "20px 22px", background: "#ffffff" }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5 }}>
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: "#64748b",
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+              }}
+            >
               Lowest Score
             </div>
             <div style={{ fontSize: 24, fontWeight: 800, color: "#f59e0b", marginTop: 4 }}>
-              {dashboardData?.stats?.lowest_score !== null && dashboardData?.stats?.lowest_score !== undefined
+              {dashboardData?.stats?.lowest_score !== null &&
+              dashboardData?.stats?.lowest_score !== undefined
                 ? `${dashboardData.stats.lowest_score}%`
                 : "—"}
             </div>
@@ -410,7 +490,10 @@ export default function Dashboard() {
         </div>
 
         {/* ── UPLOAD NEW SCAN ── */}
-        <div className="card-base" style={{ padding: "30px", marginBottom: 28, background: "#ffffff" }}>
+        <div
+          className="card-base"
+          style={{ padding: "30px", marginBottom: 28, background: "#ffffff" }}
+        >
           <h2 style={{ fontSize: 18, fontWeight: 800, color: "#0f172a", margin: "0 0 16px" }}>
             Scan a Resume
           </h2>
@@ -419,7 +502,10 @@ export default function Dashboard() {
             className={`upload-zone${dragOver ? " drag-over" : ""}`}
             style={{ padding: "32px 20px", textAlign: "center", marginBottom: 18 }}
             onClick={() => fileInputRef.current?.click()}
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
             onDragLeave={() => setDragOver(false)}
             onDrop={handleDrop}
           >
@@ -453,8 +539,17 @@ export default function Dashboard() {
           </div>
 
           <div style={{ marginBottom: 18 }}>
-            <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#334155", marginBottom: 6 }}>
-              Target Job Description <span style={{ color: "#94a3b8", fontWeight: 400 }}>(optional)</span>
+            <label
+              style={{
+                display: "block",
+                fontSize: 13,
+                fontWeight: 600,
+                color: "#334155",
+                marginBottom: 6,
+              }}
+            >
+              Target Job Description{" "}
+              <span style={{ color: "#94a3b8", fontWeight: 400 }}>(optional)</span>
             </label>
             <textarea
               value={jobDescription}
@@ -498,8 +593,20 @@ export default function Dashboard() {
             style={{ width: "100%", padding: "13px", fontSize: 15 }}
           >
             {analyzing ? (
-              <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                <span style={{ display: "inline-block", width: 16, height: 16, border: "2px solid #ffffff", borderTopColor: "transparent", borderRadius: "50%", animation: "spin-slow 0.8s linear infinite" }} />
+              <span
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+              >
+                <span
+                  style={{
+                    display: "inline-block",
+                    width: 16,
+                    height: 16,
+                    border: "2px solid #ffffff",
+                    borderTopColor: "transparent",
+                    borderRadius: "50%",
+                    animation: "spin-slow 0.8s linear infinite",
+                  }}
+                />
                 Analyzing Resume...
               </span>
             ) : (
@@ -511,7 +618,14 @@ export default function Dashboard() {
         {/* ── ACTIVE ANALYSIS REPORT VIEW ── */}
         {activeAnalysis && (
           <div style={{ marginBottom: 36 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 16,
+              }}
+            >
               <h2 style={{ fontSize: 20, fontWeight: 800, color: "#0f172a", margin: 0 }}>
                 Analysis Report: <span style={{ color: "#4f46e5" }}>{activeAnalysisTitle}</span>
               </h2>
@@ -546,14 +660,34 @@ export default function Dashboard() {
               }}
             >
               <div style={{ textAlign: "center", minWidth: 135 }}>
-                <ScoreRing score={activeAnalysis.overall_score} size={135} strokeWidth={11} label="Overall Score" />
-                <div style={{ marginTop: 8, fontSize: 13, fontWeight: 700, color: scoreColor(activeAnalysis.overall_score) }}>
+                <ScoreRing
+                  score={activeAnalysis.overall_score}
+                  size={135}
+                  strokeWidth={11}
+                  label="Overall Score"
+                />
+                <div
+                  style={{
+                    marginTop: 8,
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: scoreColor(activeAnalysis.overall_score),
+                  }}
+                >
                   {scoreLabel(activeAnalysis.overall_score)}
                 </div>
               </div>
 
               <div>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "#4f46e5", textTransform: "uppercase", letterSpacing: 1 }}>
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: "#4f46e5",
+                    textTransform: "uppercase",
+                    letterSpacing: 1,
+                  }}
+                >
                   Executive Summary
                 </span>
                 <p style={{ fontSize: 14, color: "#475569", lineHeight: 1.7, margin: "6px 0 0" }}>
@@ -561,9 +695,21 @@ export default function Dashboard() {
                 </p>
 
                 {activeAnalysis.job_match?.applicable && (
-                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #f1f5f9", display: "flex", alignItems: "center", gap: 16 }}>
+                  <div
+                    style={{
+                      marginTop: 12,
+                      paddingTop: 12,
+                      borderTop: "1px solid #f1f5f9",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 16,
+                    }}
+                  >
                     <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>
-                      Target Match: <span style={{ color: "#4f46e5" }}>{activeAnalysis.job_match.match_score}%</span>
+                      Target Match:{" "}
+                      <span style={{ color: "#4f46e5" }}>
+                        {activeAnalysis.job_match.match_score}%
+                      </span>
                     </div>
                     <div style={{ fontSize: 12, color: "#64748b" }}>
                       {activeAnalysis.job_match.explanation}
@@ -579,7 +725,9 @@ export default function Dashboard() {
                 { id: "overview", label: "Score Breakdown" },
                 { id: "strengths", label: "Strengths & Weaknesses" },
                 { id: "skills", label: "Skill Analysis" },
-                ...(activeAnalysis.job_match?.applicable ? [{ id: "jobmatch", label: "Job Match Details" }] : []),
+                ...(activeAnalysis.job_match?.applicable
+                  ? [{ id: "jobmatch", label: "Job Match Details" }]
+                  : []),
                 { id: "suggestions", label: "Actionable Suggestions" },
               ].map((tab) => (
                 <button
@@ -594,7 +742,13 @@ export default function Dashboard() {
 
             {/* Tab: Overview */}
             {activeTab === "overview" && activeAnalysis.scores && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                  gap: 12,
+                }}
+              >
                 {Object.entries(activeAnalysis.scores).map(([key, value]) => (
                   <ScoreBar
                     key={key}
@@ -608,7 +762,13 @@ export default function Dashboard() {
 
             {/* Tab: Strengths & Weaknesses */}
             {activeTab === "strengths" && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 18 }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+                  gap: 18,
+                }}
+              >
                 <ListSection
                   title="Key Strengths"
                   items={activeAnalysis.strengths}
@@ -661,7 +821,9 @@ export default function Dashboard() {
                         border: "1px solid #f1f5f9",
                       }}
                     >
-                      <span style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{s.skill}</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>
+                        {s.skill}
+                      </span>
                       <SkillBadge skill={s.status} status={s.status} />
                       <span style={{ fontSize: 13, color: "#64748b" }}>{s.evidence}</span>
                     </div>
@@ -672,9 +834,17 @@ export default function Dashboard() {
 
             {/* Tab: Job Match */}
             {activeTab === "jobmatch" && activeAnalysis.job_match?.applicable && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 18 }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+                  gap: 18,
+                }}
+              >
                 <div className="card-base" style={{ padding: 18, background: "#ffffff" }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#166534", marginBottom: 10 }}>
+                  <div
+                    style={{ fontSize: 13, fontWeight: 700, color: "#166534", marginBottom: 10 }}
+                  >
                     Matched Skills
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -685,7 +855,9 @@ export default function Dashboard() {
                 </div>
 
                 <div className="card-base" style={{ padding: 18, background: "#ffffff" }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#92400e", marginBottom: 10 }}>
+                  <div
+                    style={{ fontSize: 13, fontWeight: 700, color: "#92400e", marginBottom: 10 }}
+                  >
                     Partial Skills
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -696,7 +868,9 @@ export default function Dashboard() {
                 </div>
 
                 <div className="card-base" style={{ padding: 18, background: "#ffffff" }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#991b1b", marginBottom: 10 }}>
+                  <div
+                    style={{ fontSize: 13, fontWeight: 700, color: "#991b1b", marginBottom: 10 }}
+                  >
                     Missing Required Skills
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -726,7 +900,14 @@ export default function Dashboard() {
 
         {/* ── PAST ANALYSES HISTORY ── */}
         <div className="card-base" style={{ padding: "26px", background: "#ffffff" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 18,
+            }}
+          >
             <h2 style={{ fontSize: 18, fontWeight: 800, color: "#0f172a", margin: 0 }}>
               Past Resume Analyses
             </h2>
@@ -740,9 +921,19 @@ export default function Dashboard() {
               Loading your past resume analyses...
             </div>
           ) : pastAnalyses.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "36px 0", background: "#f8fafc", borderRadius: 12, border: "1px dashed #cbd5e1" }}>
+            <div
+              style={{
+                textAlign: "center",
+                padding: "36px 0",
+                background: "#f8fafc",
+                borderRadius: 12,
+                border: "1px dashed #cbd5e1",
+              }}
+            >
               <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: "#1e293b" }}>No past analyses yet</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#1e293b" }}>
+                No past analyses yet
+              </div>
               <div style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>
                 Upload your resume above to generate and save your first detailed report.
               </div>
@@ -838,29 +1029,84 @@ export default function Dashboard() {
         {/* ── MOCK INTERVIEW SECTION ── */}
         <div style={{ marginTop: 40 }}>
           {/* Section header */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 20,
+              flexWrap: "wrap",
+              gap: 12,
+            }}
+          >
             <div>
-              <h2 style={{ fontSize: "clamp(18px,3vw,22px)", fontWeight: 800, color: "#0f172a", margin: 0 }}>🎙️ Mock Interviews</h2>
-              <p style={{ color: "#64748b", fontSize: 14, margin: "4px 0 0" }}>AI-powered interview practice tailored to your resume</p>
+              <h2
+                style={{
+                  fontSize: "clamp(18px,3vw,22px)",
+                  fontWeight: 800,
+                  color: "#0f172a",
+                  margin: 0,
+                }}
+              >
+                🎙️ Mock Interviews
+              </h2>
+              <p style={{ color: "#64748b", fontSize: 14, margin: "4px 0 0" }}>
+                AI-powered interview practice tailored to your resume
+              </p>
             </div>
             <button
               onClick={() => navigate("/interview")}
-              style={{ padding: "10px 22px", background: "linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%)", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
+              style={{
+                padding: "10px 22px",
+                background: "linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%)",
+                color: "#fff",
+                border: "none",
+                borderRadius: 10,
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
             >
               ＋ Start New Interview
             </button>
           </div>
 
           {loadingInterviews ? (
-            <div style={{ textAlign: "center", padding: "32px", color: "#94a3b8" }}>Loading interview history…</div>
+            <div style={{ textAlign: "center", padding: "32px", color: "#94a3b8" }}>
+              Loading interview history…
+            </div>
           ) : pastInterviews.length === 0 ? (
-            <div style={{ background: "#fff", borderRadius: 16, padding: "clamp(28px,5vw,48px)", textAlign: "center", border: "1.5px dashed #c7d2fe" }}>
+            <div
+              style={{
+                background: "#fff",
+                borderRadius: 16,
+                padding: "clamp(28px,5vw,48px)",
+                textAlign: "center",
+                border: "1.5px dashed #c7d2fe",
+              }}
+            >
               <div style={{ fontSize: 40, marginBottom: 12 }}>🎙️</div>
-              <h3 style={{ fontSize: 18, fontWeight: 700, color: "#0f172a", margin: "0 0 8px" }}>No interviews yet</h3>
-              <p style={{ color: "#64748b", margin: "0 0 20px", fontSize: 14 }}>Practice answering interview questions and get instant AI feedback</p>
+              <h3 style={{ fontSize: 18, fontWeight: 700, color: "#0f172a", margin: "0 0 8px" }}>
+                No interviews yet
+              </h3>
+              <p style={{ color: "#64748b", margin: "0 0 20px", fontSize: 14 }}>
+                Practice answering interview questions and get instant AI feedback
+              </p>
               <button
                 onClick={() => navigate("/interview")}
-                style={{ padding: "12px 28px", background: "linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%)", color: "#fff", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 700, cursor: "pointer" }}
+                style={{
+                  padding: "12px 28px",
+                  background: "linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%)",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 10,
+                  fontSize: 15,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
               >
                 Start Your First Interview →
               </button>
@@ -868,37 +1114,95 @@ export default function Dashboard() {
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {pastInterviews.map((iv) => {
-                const ivScore = iv.overall_score !== null ? Number(iv.overall_score).toFixed(1) : null;
-                const ivScoreColor = ivScore >= 7 ? "#16a34a" : ivScore >= 5 ? "#d97706" : "#dc2626";
+                const ivScore =
+                  iv.overall_score !== null ? Number(iv.overall_score).toFixed(1) : null;
+                const ivScoreColor =
+                  ivScore >= 7 ? "#16a34a" : ivScore >= 5 ? "#d97706" : "#dc2626";
                 const ivScoreBg = ivScore >= 7 ? "#dcfce7" : ivScore >= 5 ? "#fef3c7" : "#fee2e2";
                 return (
                   <div
                     key={iv.id}
                     className="card-base card-hover"
-                    style={{ padding: "18px 22px", display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", cursor: "default" }}
+                    style={{
+                      padding: "18px 22px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 16,
+                      flexWrap: "wrap",
+                      cursor: "default",
+                    }}
                   >
                     {/* Score badge */}
                     {ivScore !== null ? (
-                      <div style={{ background: ivScoreBg, borderRadius: 12, padding: "10px 14px", textAlign: "center", flexShrink: 0 }}>
-                        <div style={{ fontSize: 20, fontWeight: 800, color: ivScoreColor }}>{ivScore}</div>
+                      <div
+                        style={{
+                          background: ivScoreBg,
+                          borderRadius: 12,
+                          padding: "10px 14px",
+                          textAlign: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <div style={{ fontSize: 20, fontWeight: 800, color: ivScoreColor }}>
+                          {ivScore}
+                        </div>
                         <div style={{ fontSize: 10, color: "#64748b", fontWeight: 600 }}>/ 10</div>
                       </div>
                     ) : (
-                      <div style={{ background: "#f1f5f9", borderRadius: 12, padding: "10px 14px", textAlign: "center", flexShrink: 0 }}>
+                      <div
+                        style={{
+                          background: "#f1f5f9",
+                          borderRadius: 12,
+                          padding: "10px 14px",
+                          textAlign: "center",
+                          flexShrink: 0,
+                        }}
+                      >
                         <div style={{ fontSize: 14, color: "#94a3b8" }}>—</div>
                       </div>
                     )}
 
                     {/* Info */}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 15, color: "#0f172a", marginBottom: 4 }}>{iv.job_role}</div>
-                      <div style={{ fontSize: 13, color: "#64748b", display: "flex", gap: 12, flexWrap: "wrap" }}>
-                        <span>{iv.answered_count}/{iv.question_count} questions answered</span>
+                      <div
+                        style={{ fontWeight: 700, fontSize: 15, color: "#0f172a", marginBottom: 4 }}
+                      >
+                        {iv.job_role}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          color: "#64748b",
+                          display: "flex",
+                          gap: 12,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <span>
+                          {iv.answered_count}/{iv.question_count} questions answered
+                        </span>
                         <span>•</span>
-                        <span>{new Date(iv.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                        <span>
+                          {new Date(iv.created_at).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                        </span>
                       </div>
                       {iv.verdict && (
-                        <p style={{ fontSize: 12, color: "#94a3b8", marginTop: 4, lineHeight: 1.5, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical" }}>
+                        <p
+                          style={{
+                            fontSize: 12,
+                            color: "#94a3b8",
+                            marginTop: 4,
+                            lineHeight: 1.5,
+                            overflow: "hidden",
+                            display: "-webkit-box",
+                            WebkitLineClamp: 1,
+                            WebkitBoxOrient: "vertical",
+                          }}
+                        >
                           {iv.verdict}
                         </p>
                       )}
@@ -906,16 +1210,29 @@ export default function Dashboard() {
 
                     {/* Status pill + action */}
                     <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-                      <span style={{
-                        fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 99,
-                        background: iv.status === "completed" ? "#dcfce7" : "#fef3c7",
-                        color: iv.status === "completed" ? "#15803d" : "#b45309"
-                      }}>
+                      <span
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 700,
+                          padding: "4px 10px",
+                          borderRadius: 99,
+                          background: iv.status === "completed" ? "#dcfce7" : "#fef3c7",
+                          color: iv.status === "completed" ? "#15803d" : "#b45309",
+                        }}
+                      >
                         {iv.status === "completed" ? "Completed" : "In Progress"}
                       </span>
                       <button
                         onClick={() => navigate("/interview")}
-                        style={{ fontSize: 13, fontWeight: 600, color: "#4f46e5", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: "#4f46e5",
+                          background: "transparent",
+                          border: "none",
+                          cursor: "pointer",
+                          padding: 0,
+                        }}
                       >
                         Practice Again →
                       </button>
@@ -926,7 +1243,6 @@ export default function Dashboard() {
             </div>
           )}
         </div>
-
       </div>
     </div>
   );
