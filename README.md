@@ -4,6 +4,17 @@
 
 ---
 
+## 🌐 Live Demo
+
+| Service | URL |
+|---|---|
+| 🖥️ **Frontend (Vercel)** | [hack-in-motion-ricr-him-1236-b8so-two.vercel.app](https://hack-in-motion-ricr-him-1236-b8so-two.vercel.app) |
+| ⚙️ **Backend API (Render)** | [hackinmotion-ricr-him-1236.onrender.com](https://hackinmotion-ricr-him-1236.onrender.com) |
+
+> **Note**: The backend is hosted on Render's free tier and may take **30–60 seconds to wake up** on first request after inactivity.
+
+---
+
 ## 📌 Project Overview
 
 **Vettora** is a comprehensive career readiness platform built to help candidates navigate modern automated hiring systems (ATS) and excel in technical interviews. 
@@ -47,7 +58,7 @@ Over 75% of resumes are filtered out before reaching a human recruiter due to no
 
 ### ⚙️ Backend
 - **Framework**: Python 3.11+ / Django 6.1 + Django REST Framework (DRF)
-- **AI Engine**: Google Gemini API (`google-genai` / `gemini-2.5-flash`)
+- **AI Engine**: Google Gemini API (`google-genai` / `gemini-flash-latest` with multi-model fallback)
 - **Document Parsing**: PyMuPDF (`fitz`) for PDF and `python-docx` for Word documents
 - **CORS & Auth**: `django-cors-headers`, Firebase Admin SDK (`firebase_admin`)
 
@@ -125,9 +136,11 @@ cd HackInMotion-RICR-HIM-1236
 4. **Set up Environment Variables**:
    Create a `.env` file inside the `backend/` directory:
    ```env
-   SECRET_KEY=your_django_secret_key
-   DEBUG=True
+   DJANGO_SECRET_KEY=your_django_secret_key
+   DJANGO_DEBUG=True
    GEMINI_API_KEY=your_google_gemini_api_key
+   DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
+   DJANGO_CORS_ALLOWED_ORIGINS=http://localhost:5173
    ```
 
 5. **Apply Migrations**:
