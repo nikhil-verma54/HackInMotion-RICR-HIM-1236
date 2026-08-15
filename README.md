@@ -2,6 +2,13 @@
 
 > **Land more job interviews with intelligent ATS optimization, skill gap insights, and realistic voice-enabled mock interviews.**
 
+![Status](https://img.shields.io/badge/status-production--ready-brightgreen?style=for-the-badge)
+![Backend](https://img.shields.io/badge/backend-Render%20%2B%20PostgreSQL-46E3B7?style=for-the-badge&logo=render)
+![Frontend](https://img.shields.io/badge/frontend-Vercel-black?style=for-the-badge&logo=vercel)
+![Auth](https://img.shields.io/badge/auth-Firebase-FFCA28?style=for-the-badge&logo=firebase)
+
+> 🎉 **Project is live and fully production-ready!** Backend deployed on Render with PostgreSQL, frontend deployed on Vercel, Firebase authentication active.
+
 ---
 
 ## 🌐 Live Demo
@@ -216,3 +223,17 @@ cd HackInMotion-RICR-HIM-1236
 
 ## 📄 License & Attribution
 Developed with ❤️ for **HackInMotion**. Feel free to contribute, open issues, and submit pull requests!
+
+---
+
+## 🏁 Deployment Status — Final
+
+| Component | Status | Platform |
+|---|---|---|
+| 🖥️ Frontend | ✅ Live | Vercel |
+| ⚙️ Backend API | ✅ Live | Render |
+| 🗄️ Database | ✅ PostgreSQL managed | Render |
+| 🔐 Authentication | ✅ Firebase Auth active | Firebase |
+| 🤖 AI Engine | ✅ Gemini API connected | Google AI |
+
+> **This project is complete and production-ready.** All services are deployed, authenticated, and communicating correctly.
