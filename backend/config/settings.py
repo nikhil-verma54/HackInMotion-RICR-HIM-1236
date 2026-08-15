@@ -10,8 +10,11 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
-from pathlib import Path
 import os
+from pathlib import Path
+
+from corsheaders.defaults import default_headers
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -20,27 +23,43 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
+# ---------------------------------------------------------------------------
+# SECURITY
+# ---------------------------------------------------------------------------
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-vl#a!jcq7j&%3t0h=86e&(a21^jqya6=arrwc!dh-@#4y%7h(u"
+# SECRET_KEY — MUST be set in .env; never hardcode.
+_secret_key = os.getenv("DJANGO_SECRET_KEY")
+if not _secret_key:
+    raise ImproperlyConfigured(
+        "DJANGO_SECRET_KEY environment variable is not set. Add it to your backend/.env file."
+    )
+SECRET_KEY = _secret_key
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# DEBUG — default False for safe production operation.
+DEBUG = os.getenv("DJANGO_DEBUG", "False").strip().lower() in ("true", "1", "yes")
 
-ALLOWED_HOSTS = []
+# ALLOWED_HOSTS — comma-separated in env; localhost-only when DEBUG=True.
+_raw_hosts = os.getenv("DJANGO_ALLOWED_HOSTS", "")
+if _raw_hosts:
+    ALLOWED_HOSTS = [h.strip() for h in _raw_hosts.split(",") if h.strip()]
+elif DEBUG:
+    ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+else:
+    ALLOWED_HOSTS = []
+
+# ---------------------------------------------------------------------------
+# GEMINI / FIREBASE CONFIG
+# ---------------------------------------------------------------------------
+
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
 
-GEMINI_MODEL = "gemini-3.5-flash"
+FIREBASE_SERVICE_ACCOUNT = os.path.join(BASE_DIR, "firebase", "serviceAccountKey.json")
 
 
-# Application definition
-FIREBASE_SERVICE_ACCOUNT = os.path.join(
-    BASE_DIR,
-    "firebase",
-    "serviceAccountKey.json"
-)
+# ---------------------------------------------------------------------------
+# APPLICATION DEFINITION
+# ---------------------------------------------------------------------------
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -87,8 +106,9 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 
-# Database
-# https://docs.djangoproject.com/en/6.1/ref/settings/#databases
+# ---------------------------------------------------------------------------
+# DATABASE
+# ---------------------------------------------------------------------------
 
 DATABASES = {
     "default": {
@@ -98,8 +118,9 @@ DATABASES = {
 }
 
 
-# Password validation
-# https://docs.djangoproject.com/en/6.1/ref/settings/#auth-password-validators
+# ---------------------------------------------------------------------------
+# PASSWORD VALIDATION
+# ---------------------------------------------------------------------------
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -117,58 +138,63 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
-# Internationalization
-# https://docs.djangoproject.com/en/6.1/topics/i18n/
+# ---------------------------------------------------------------------------
+# INTERNATIONALISATION
+# ---------------------------------------------------------------------------
 
 LANGUAGE_CODE = "en-us"
-
 TIME_ZONE = "UTC"
-
 USE_I18N = True
-
 USE_TZ = True
 
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/6.1/howto/static-files/
+# ---------------------------------------------------------------------------
+# STATIC FILES
+# ---------------------------------------------------------------------------
 
 STATIC_URL = "static/"
 
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Email
-# https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 
-MAILERS = {
-    "default": {
-        "BACKEND": "django.core.mail.backends.console.EmailBackend",
-    },
-}
-from corsheaders.defaults import default_headers
+# ---------------------------------------------------------------------------
+# CORS
+# ---------------------------------------------------------------------------
 
-# Restrict CORS to the frontend origin and allow credentials
 CORS_ALLOW_ALL_ORIGINS = False
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "http://127.0.0.1:5173",
-    "http://127.0.0.1:5174",
-]
 
-# Ensure the Authorization header is allowed for CORS requests
-CORS_ALLOW_HEADERS = list(default_headers) + [
-    "authorization",
-]
+_raw_cors = os.getenv(
+    "DJANGO_CORS_ALLOWED_ORIGINS",
+    "http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174"
+    if DEBUG
+    else "",
+)
+CORS_ALLOWED_ORIGINS = [o.strip() for o in _raw_cors.split(",") if o.strip()]
 
-# Allow cookies/sessions for browser requests when needed
+# Allow the Authorization header for Firebase token-based auth
+CORS_ALLOW_HEADERS = list(default_headers) + ["authorization"]
+
+# Allow cookies/sessions for browser requests
 CORS_ALLOW_CREDENTIALS = True
 
-# Allow cross-site cookies for local development (adjust for production!)
-SESSION_COOKIE_SAMESITE = None
-CSRF_COOKIE_SAMESITE = None
 
-# Not secure for production — development only
-SESSION_COOKIE_SECURE = False
-CSRF_COOKIE_SECURE = False
+# ---------------------------------------------------------------------------
+# COOKIES & SESSION SECURITY
+# ---------------------------------------------------------------------------
+
+# SameSite=Lax works correctly for localhost development and is secure for
+# production (unlike None which requires Secure + HTTPS).
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"
+
+# Secure=True only in production (not DEBUG). Keeps local HTTP dev working.
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+
+
+# ---------------------------------------------------------------------------
+# REST FRAMEWORK
+# ---------------------------------------------------------------------------
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [

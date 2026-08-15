@@ -1,21 +1,21 @@
-from rest_framework.views import APIView
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
-from rest_framework.response import Response
-from rest_framework import status
-
-# Initialize Firebase Admin SDK
-from config import firebase
-
 from firebase_admin import auth
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from authentication.models import UserProfile
+from config.firebase import init_firebase
 
 
 @method_decorator(csrf_exempt, name="dispatch")
 class FirebaseLoginView(APIView):
-
     def post(self, request):
+        try:
+            init_firebase()
+        except Exception:
+            pass
 
         # ==========================================
         # 1. GET FIREBASE ID TOKEN
@@ -25,15 +25,11 @@ class FirebaseLoginView(APIView):
 
         if not id_token:
             return Response(
-                {
-                    "success": False,
-                    "error": "Firebase ID token is required."
-                },
-                status=status.HTTP_400_BAD_REQUEST
+                {"success": False, "error": "Firebase ID token is required."},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         try:
-
             # ==========================================
             # 2. VERIFY FIREBASE TOKEN
             # ==========================================
@@ -59,7 +55,7 @@ class FirebaseLoginView(APIView):
                     "email": email or "",
                     "name": name,
                     "photo_url": picture,
-                }
+                },
             )
 
             # ==========================================
@@ -80,7 +76,7 @@ class FirebaseLoginView(APIView):
             try:
                 request.session["firebase_uid"] = firebase_uid
                 request.session.save()
-            except Exception as e:
+            except Exception:
                 pass  # session save failure is non-fatal
 
             # ==========================================
@@ -91,23 +87,19 @@ class FirebaseLoginView(APIView):
                 {
                     "success": True,
                     "message": "Authentication successful.",
-
                     "user": {
                         "id": user.id,
                         "firebase_uid": user.firebase_uid,
                         "email": user.email,
                         "name": user.name,
                         "picture": user.photo_url,
-                    }
+                    },
                 },
-                status=status.HTTP_200_OK
+                status=status.HTTP_200_OK,
             )
 
-        except Exception as e:
+        except Exception:
             return Response(
-                {
-                    "success": False,
-                    "error": "Invalid or expired Firebase ID token."
-                },
-                status=status.HTTP_401_UNAUTHORIZED
+                {"success": False, "error": "Invalid or expired Firebase ID token."},
+                status=status.HTTP_401_UNAUTHORIZED,
             )

@@ -1,5 +1,6 @@
 from .models import UserProfile
 
+
 class FirebaseSessionMiddleware:
     """If a Django session contains `firebase_uid`, attach the corresponding
     `UserProfile` to `request.user` so DRF's SessionAuthentication works as a
@@ -19,9 +20,7 @@ class FirebaseSessionMiddleware:
 
                 if firebase_uid:
                     try:
-                        profile = UserProfile.objects.filter(
-                            firebase_uid=firebase_uid
-                        ).first()
+                        profile = UserProfile.objects.filter(firebase_uid=firebase_uid).first()
 
                         if profile:
                             request.user = profile
