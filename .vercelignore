@@ -1,0 +1,3 @@
+# Exclude backend from Vercel - it is deployed separately on Render
+backend/
+render.yaml
