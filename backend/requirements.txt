@@ -27,3 +27,7 @@ requests>=2.31.0
 httpx>=0.27.0
 sqlparse>=0.4.4
 asgiref>=3.7.0
+
+# Database (PostgreSQL for Render, SQLite for local dev)
+dj-database-url>=2.1.0
+psycopg2-binary>=2.9.9

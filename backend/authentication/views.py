@@ -14,8 +14,11 @@ class FirebaseLoginView(APIView):
     def post(self, request):
         try:
             init_firebase()
-        except Exception:
-            pass
+        except Exception as exc:
+            return Response(
+                {"success": False, "error": f"Firebase initialization failed: {exc}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         # ==========================================
         # 1. GET FIREBASE ID TOKEN

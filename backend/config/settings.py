@@ -13,6 +13,8 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 import os
 from pathlib import Path
 
+import dj_database_url
+
 from corsheaders.defaults import default_headers
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
@@ -110,13 +112,19 @@ WSGI_APPLICATION = "config.wsgi.application"
 # ---------------------------------------------------------------------------
 # DATABASE
 # ---------------------------------------------------------------------------
+# On Render: DATABASE_URL is injected automatically from the linked PostgreSQL.
+# Locally: falls back to SQLite so no extra setup is needed.
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+_db_url = os.getenv("DATABASE_URL")
+if _db_url:
+    DATABASES = {"default": dj_database_url.config(default=_db_url, conn_max_age=600)}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
     }
-}
 
 
 # ---------------------------------------------------------------------------
