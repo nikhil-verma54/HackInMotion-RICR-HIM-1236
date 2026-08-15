@@ -175,14 +175,24 @@ CORS_ALLOW_ALL_ORIGINS = False
 
 _raw_cors = os.getenv(
     "DJANGO_CORS_ALLOWED_ORIGINS",
-    "http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174"
-    if DEBUG
-    else "",
+    "http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174,https://hack-in-motion-ricr-him-1236-b8so-two.vercel.app",
 )
 CORS_ALLOWED_ORIGINS = [o.strip() for o in _raw_cors.split(",") if o.strip()]
 
+# Automatically allow all Vercel deployment domains and local ports
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https:\/\/.*\.vercel\.app$",
+    r"^http:\/\/localhost(:\d+)?$",
+    r"^http:\/\/127\.0.0\.1(:\d+)?$",
+]
+
 # Allow the Authorization header for Firebase token-based auth
-CORS_ALLOW_HEADERS = list(default_headers) + ["authorization"]
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    "authorization",
+    "content-type",
+    "x-csrftoken",
+    "accept",
+]
 
 # Allow cookies/sessions for browser requests
 CORS_ALLOW_CREDENTIALS = True
