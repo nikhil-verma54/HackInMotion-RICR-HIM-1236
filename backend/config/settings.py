@@ -38,14 +38,14 @@ SECRET_KEY = _secret_key
 # DEBUG — default False for safe production operation.
 DEBUG = os.getenv("DJANGO_DEBUG", "False").strip().lower() in ("true", "1", "yes")
 
-# ALLOWED_HOSTS — comma-separated in env; localhost-only when DEBUG=True.
-_raw_hosts = os.getenv("DJANGO_ALLOWED_HOSTS", "")
-if _raw_hosts:
-    ALLOWED_HOSTS = [h.strip() for h in _raw_hosts.split(",") if h.strip()]
-elif DEBUG:
-    ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
-else:
-    ALLOWED_HOSTS = []
+# ALLOWED_HOSTS — comma-separated in env; includes .onrender.com, localhost, 127.0.0.1 by default.
+_raw_hosts = os.getenv(
+    "DJANGO_ALLOWED_HOSTS",
+    "localhost,127.0.0.1,.onrender.com,hackinmotion-ricr-him-1236.onrender.com",
+)
+ALLOWED_HOSTS = [h.strip() for h in _raw_hosts.split(",") if h.strip()]
+if ".onrender.com" not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(".onrender.com")
 
 # ---------------------------------------------------------------------------
 # GEMINI / FIREBASE CONFIG
