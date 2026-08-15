@@ -1,0 +1,27 @@
+[tool.ruff]
+line-length = 100
+# Exclude paths that should not be linted
+exclude = [
+    "venv",
+    ".venv",
+    "migrations",
+    "__pycache__",
+    "*.pyc",
+    "db.sqlite3",
+]
+
+[tool.ruff.lint]
+# E = pycodestyle errors, F = pyflakes, W = pycodestyle warnings
+# I = isort, UP = pyupgrade, B = flake8-bugbear
+select = ["E", "F", "W", "I", "UP", "B"]
+# Ignore long lines in migration files (auto-generated)
+ignore = [
+    "E501",   # line too long — enforced by line-length above
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["analyzer", "authentication", "config"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
