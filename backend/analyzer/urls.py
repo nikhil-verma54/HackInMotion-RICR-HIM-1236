@@ -1,17 +1,17 @@
 from django.urls import path
+
 from .views import (
-    UploadResumeView,
     AnalyzeResumeView,
-    test_auth,
-    dashboard,
+    UploadResumeView,
     analysis_detail,
+    dashboard,
+    finish_interview,
+    interview_detail,
+    interview_history,
     start_interview,
     submit_answer,
-    finish_interview,
-    interview_history,
-    interview_detail,
+    test_auth,
 )
-
 
 urlpatterns = [
     path("upload/", UploadResumeView.as_view(), name="upload-resume"),
@@ -19,7 +19,6 @@ urlpatterns = [
     path("test-auth/", test_auth, name="test-auth"),
     path("dashboard/", dashboard, name="dashboard"),
     path("history/<int:analysis_id>/", analysis_detail, name="analysis-detail"),
-
     # Mock Interview endpoints
     path("interview/start/", start_interview, name="interview-start"),
     path("interview/<int:interview_id>/answer/", submit_answer, name="interview-answer"),

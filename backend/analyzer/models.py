@@ -1,13 +1,10 @@
 from django.db import models
+
 from authentication.models import UserProfile
 
 
 class ResumeAnalysis(models.Model):
-    user = models.ForeignKey(
-        UserProfile,
-        on_delete=models.CASCADE,
-        related_name="analyses"
-    )
+    user = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name="analyses")
     filename = models.CharField(max_length=255)
     overall_score = models.IntegerField(default=0)
     job_description = models.TextField(blank=True, null=True)
@@ -29,11 +26,7 @@ class MockInterview(models.Model):
         ("completed", "Completed"),
     ]
 
-    user = models.ForeignKey(
-        UserProfile,
-        on_delete=models.CASCADE,
-        related_name="interviews"
-    )
+    user = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name="interviews")
     job_role = models.CharField(max_length=255)
     resume_text = models.TextField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="in_progress")
@@ -50,17 +43,13 @@ class MockInterview(models.Model):
 
 
 class InterviewQuestion(models.Model):
-    interview = models.ForeignKey(
-        MockInterview,
-        on_delete=models.CASCADE,
-        related_name="questions"
-    )
+    interview = models.ForeignKey(MockInterview, on_delete=models.CASCADE, related_name="questions")
     order = models.PositiveIntegerField(default=0)
     question_text = models.TextField()
     question_type = models.CharField(max_length=50, default="general")  # technical / behavioral
     user_answer = models.TextField(blank=True, null=True)
-    ai_score = models.FloatField(null=True, blank=True)       # 0-10
-    ai_feedback = models.JSONField(null=True, blank=True)     # {clarity, relevance, completeness, tip}
+    ai_score = models.FloatField(null=True, blank=True)  # 0-10
+    ai_feedback = models.JSONField(null=True, blank=True)  # {clarity, relevance, completeness, tip}
     answered_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:

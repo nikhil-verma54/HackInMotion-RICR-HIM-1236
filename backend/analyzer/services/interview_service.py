@@ -4,9 +4,31 @@ import re
 from django.conf import settings
 from google import genai
 
-
 client = genai.Client(api_key=settings.GEMINI_API_KEY)
-MODEL_NAME = settings.GEMINI_MODEL
+PRIMARY_MODEL = getattr(settings, "GEMINI_MODEL", "gemini-flash-latest")
+FALLBACK_MODELS = [PRIMARY_MODEL, "gemini-flash-latest", "gemini-flash-lite-latest"]
+MODELS_TO_TRY = list(dict.fromkeys(FALLBACK_MODELS))
+
+
+def _generate_with_fallback(contents, config=None):
+    """Generate content trying primary model first, falling back to backup models on 404/503/429."""
+    last_error = None
+    for model_name in MODELS_TO_TRY:
+        try:
+            if config:
+                return client.models.generate_content(
+                    model=model_name,
+                    contents=contents,
+                    config=config,
+                )
+            return client.models.generate_content(
+                model=model_name,
+                contents=contents,
+            )
+        except Exception as exc:
+            last_error = exc
+            continue
+    raise last_error
 
 
 def clean_json_response(raw: str):
@@ -17,25 +39,39 @@ def clean_json_response(raw: str):
         if match:
             raw = match.group(1).strip()
 
-    first_bracket = min([i for i in [raw.find('['), raw.find('{')] if i != -1], default=-1)
+    first_bracket = min([i for i in [raw.find("["), raw.find("{")] if i != -1], default=-1)
     if first_bracket != -1:
-        if raw[first_bracket] == '[':
-            last_bracket = raw.rfind(']')
+        if raw[first_bracket] == "[":
+            last_bracket = raw.rfind("]")
         else:
-            last_bracket = raw.rfind('}')
+            last_bracket = raw.rfind("}")
         if last_bracket != -1:
-            raw = raw[first_bracket:last_bracket + 1]
+            raw = raw[first_bracket : last_bracket + 1]
 
     return json.loads(raw)
 
 
-def generate_questions(resume_text: str, job_role: str) -> list[dict]:
+def generate_questions(
+    resume_text: str, job_role: str, structured_resume: dict | None = None
+) -> list[dict]:
     """
     Generate 10 interview questions based on candidate's resume and target job role:
     - 7 Technical questions arranged from Easy to Hard
     - 3 Behavioral questions
     Returns a list of dicts: [{ "question": str, "type": "technical"|"behavioral", "difficulty": "Easy"|"Medium"|"Hard"|"Behavioral" }]
     """
+    structured_context = ""
+    if structured_resume and isinstance(structured_resume, dict):
+        skills = structured_resume.get("skills") or []
+        experience = structured_resume.get("experience") or []
+        projects = structured_resume.get("projects") or []
+        structured_context = f"""
+STRUCTURED PROFILE HIGHLIGHTS:
+- Identified Skills: {", ".join(str(s) for s in skills[:15]) if skills else "N/A"}
+- Experience Items: {len(experience)} positions
+- Key Projects: {", ".join(p.get("name", "Project") for p in projects[:5] if isinstance(p, dict)) if projects else "N/A"}
+"""
+
     prompt = f"""
 You are an expert technical interviewer and hiring manager.
 Based on the candidate's resume and target job role, generate exactly 10 interview questions.
@@ -53,6 +89,8 @@ STRUCTURE (Total 10 Questions):
 10. Question 10 (Behavioral): Leadership, ownership, mentorship, or driving a project to successful delivery.
 
 TARGET JOB ROLE: {job_role}
+
+{structured_context}
 
 CANDIDATE'S RESUME:
 {resume_text}
@@ -77,10 +115,7 @@ Return ONLY valid JSON in this exact structure:
   {{"order": 10, "question": "...", "type": "behavioral", "difficulty": "Behavioral"}}
 ]
 """
-    response = client.models.generate_content(
-        model=MODEL_NAME,
-        contents=prompt,
-    )
+    response = _generate_with_fallback(contents=prompt)
     return clean_json_response(response.text)
 
 
@@ -116,10 +151,7 @@ Return ONLY valid JSON in this exact format:
   "tip": "..."
 }}
 """
-    response = client.models.generate_content(
-        model=MODEL_NAME,
-        contents=prompt,
-    )
+    response = _generate_with_fallback(contents=prompt)
     return clean_json_response(response.text)
 
 
@@ -151,8 +183,5 @@ Return ONLY valid JSON in this exact format:
   "verdict": "A 2-3 sentence overall verdict on the candidate's readiness for the role."
 }}
 """
-    response = client.models.generate_content(
-        model=MODEL_NAME,
-        contents=prompt,
-    )
+    response = _generate_with_fallback(contents=prompt)
     return clean_json_response(response.text)
